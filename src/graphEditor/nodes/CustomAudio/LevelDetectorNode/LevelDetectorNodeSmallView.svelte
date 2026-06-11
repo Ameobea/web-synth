@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const settings: ControlPanelSetting[] = [
     { type: 'range', min: 1, max: 1000, steps: 500, scale: 'log', label: 'window size ms' },
   ];
@@ -10,44 +10,39 @@
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { LevelDetectorNodeState } from 'src/graphEditor/nodes/CustomAudio/LevelDetectorNode/LevelDetectorNode';
   import { msToSamples, samplesToMs } from 'src/util';
-  import { onDestroy } from 'svelte';
   import type { Writable } from 'svelte/store';
 
-  export let state: Writable<LevelDetectorNodeState>;
-  export let detectedLevelSAB: Writable<Float32Array | null>;
-  export let onChange: (newState: LevelDetectorNodeState) => void;
-
-  let intervalHandle: NodeJS.Timeout | null = null;
-  let detectedLevel: number | null = null;
-  $: detectedLevelDb = Math.max(
-    detectedLevel !== null ? 20 * Math.log10(detectedLevel) : -Infinity,
-    -100
-  );
-
-  $: {
-    if (intervalHandle !== null) {
-      clearInterval(intervalHandle);
-    }
-    const sab = $detectedLevelSAB;
-    if (sab) {
-      intervalHandle = setInterval(() => {
-        detectedLevel = sab[0];
-      }, 100);
-    }
+  interface Props {
+    state: Writable<LevelDetectorNodeState>;
+    detectedLevelSAB: Writable<Float32Array | null>;
+    onChange: (newState: LevelDetectorNodeState) => void;
   }
 
-  onDestroy(() => {
-    if (intervalHandle !== null) {
-      clearInterval(intervalHandle);
+  let { state: stateStore, detectedLevelSAB, onChange }: Props = $props();
+
+  let detectedLevel: number | null = $state(null);
+  let detectedLevelDb = $derived(Math.max(
+    detectedLevel !== null ? 20 * Math.log10(detectedLevel) : -Infinity,
+    -100
+  ));
+
+  $effect(() => {
+    const sab = $detectedLevelSAB;
+    if (!sab) {
+      return;
     }
+    const intervalHandle = setInterval(() => {
+      detectedLevel = sab[0];
+    }, 100);
+    return () => clearInterval(intervalHandle);
   });
 
-  $: controlPanelState = { 'window size ms': samplesToMs($state.windowSizeSamples) };
+  let controlPanelState = $derived({ 'window size ms': samplesToMs($stateStore.windowSizeSamples) });
 
   const handleChange = (key: string, value: any) => {
     switch (key) {
       case 'window size ms':
-        onChange({ ...$state, windowSizeSamples: msToSamples(value) });
+        onChange({ ...$stateStore, windowSizeSamples: msToSamples(value) });
         break;
       default:
         console.error('Unhandled key in `LevelDetectorNodeSmallView`:', key);

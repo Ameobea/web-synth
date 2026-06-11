@@ -1,19 +1,28 @@
 <script lang="ts">
   import type { WavetablePreset } from 'src/api';
 
-  export let setActiveWaveformIx: (newIx: number) => void;
-  export let addWaveform: () => void;
-  export let activeWaveformIx: number;
-  export let presetState: WavetablePreset;
+  interface Props {
+    setActiveWaveformIx: (newIx: number) => void;
+    addWaveform: () => void;
+    activeWaveformIx: number;
+    presetState: WavetablePreset;
+  }
+
+  let {
+    setActiveWaveformIx,
+    addWaveform,
+    activeWaveformIx,
+    presetState
+  }: Props = $props();
 </script>
 
 <div class="root">
   {#each presetState.waveforms as _waveform, ix}
-    <button on:click={() => setActiveWaveformIx(ix)} class:active={ix === activeWaveformIx}>
+    <button onclick={() => setActiveWaveformIx(ix)} class:active={ix === activeWaveformIx}>
       {ix + 1}
     </button>
   {/each}
-  <button on:click={addWaveform}>+</button>
+  <button onclick={addWaveform}>+</button>
 </div>
 
 <style lang="css">

@@ -6,7 +6,7 @@ import './RangeInput.css';
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/types';
 import type { Writable } from 'svelte/store';
 import ResponsePlotSvelte from './ResponsePlot.svelte';
-import { mkSvelteComponentShim } from 'src/svelteUtils';
+import { mkSvelteComponentShim } from 'src/svelteUtils.svelte';
 import { RangeInput } from 'src/graphEditor/nodes/CustomAudio/ScaleAndShift/RangeInput';
 
 const ResponsePlot = mkSvelteComponentShim(ResponsePlotSvelte);

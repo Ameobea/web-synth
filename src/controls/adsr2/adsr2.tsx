@@ -19,6 +19,8 @@ import {
   registerVcHideCb,
   unregisterVcHideCb,
 } from 'src/ViewContextManager/VcHideStatusRegistry';
+import { mount, unmount } from 'svelte';
+
 import ConfigureStepControlPanel from './ConfigureStepControlPanel.svelte';
 import ConfigureRampControlPanel from './ConfigureRampControlPanel.svelte';
 import type { FederatedPointerEvent } from '@pixi/events';
@@ -47,7 +49,7 @@ interface ADSR2Sprites {
 }
 
 interface StepHandleConfiguratorCtx {
-  inst: ConfigureStepControlPanel;
+  inst: Record<string, any>;
 }
 
 if (PIXI.settings.RENDER_OPTIONS) {
@@ -125,7 +127,7 @@ class RampHandle {
   private graphics!: PIXI.Graphics;
   private renderedRegion: RenderedRegion;
   private lastClickTime = 0;
-  configurator: { inst: ConfigureRampControlPanel } | null = null;
+  configurator: { inst: Record<string, any> } | null = null;
 
   private computeInitialPos(): PIXI.Point {
     const rampStartPx = computeTransformedXPosition(
@@ -300,7 +302,7 @@ class RampHandle {
     }
 
     this.configurator = {
-      inst: new ConfigureRampControlPanel({
+      inst: mount(ConfigureRampControlPanel, {
         props: {
           top: y - 50,
           left: x,
@@ -340,7 +342,9 @@ class RampHandle {
   }
 
   private closeConfigurator() {
-    this.configurator?.inst.$destroy();
+    if (this.configurator) {
+      void unmount(this.configurator.inst);
+    }
     this.configurator = null;
   }
 
@@ -1520,7 +1524,7 @@ export class ADSR2Instance {
       return;
     }
 
-    this.stepHandleConfigurator.inst.$destroy();
+    void unmount(this.stepHandleConfigurator.inst);
     this.stepHandleConfigurator = null;
   }
 
@@ -1541,7 +1545,7 @@ export class ADSR2Instance {
     const { x, y } = evt;
 
     this.stepHandleConfigurator = {
-      inst: new ConfigureStepControlPanel({
+      inst: mount(ConfigureStepControlPanel, {
         props: {
           top: y - 50,
           left: x,

@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const AVAILABLE_UNITS = ['samples', 'beats', 'seconds', 'milliseconds', 'hz', 'bpm'];
 </script>
 
@@ -7,10 +7,13 @@
   import type { TimeConverterNode } from './TimeConverterNode';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 
-  export let node: TimeConverterNode;
+  interface Props {
+    node: TimeConverterNode;
+  }
 
-  let settings: ControlPanelSetting[] = [];
-  $: settings = [
+  let { node }: Props = $props();
+
+  const settings: ControlPanelSetting[] = [
     { label: 'from unit', type: 'select', options: AVAILABLE_UNITS },
     { label: 'to unit', type: 'select', options: AVAILABLE_UNITS },
   ];
@@ -27,14 +30,14 @@
         console.error(`Unhandled key in \`TimeConverterSmallView\`: ${key}`);
     }
   };
-  $: stateStore = node.state;
-  $: nodeState = $stateStore;
+  let stateStore = $derived(node.state);
+  let nodeState = $derived($stateStore);
 
-  $: state = { 'from unit': nodeState.fromUnit, 'to unit': nodeState.toUnit };
+  let cpState = $derived({ 'from unit': nodeState.fromUnit, 'to unit': nodeState.toUnit });
 </script>
 
 <div class="root">
-  <SvelteControlPanel {settings} {state} onChange={handleChange} width={500} />
+  <SvelteControlPanel {settings} state={cpState} onChange={handleChange} width={500} />
 </div>
 
 <style lang="css">

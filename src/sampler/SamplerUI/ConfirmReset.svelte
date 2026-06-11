@@ -1,17 +1,27 @@
 <script lang="ts">
-  export let onSubmit: () => void;
-  export let onCancel: () => void;
 
-  export let message = 'Are you sure you want to reset completely to scratch?';
-  export let resetMessage = 'Reset';
-  export let cancelMessage = 'Cancel';
+  interface Props {
+    onSubmit: () => void;
+    onCancel: () => void;
+    message?: string;
+    resetMessage?: string;
+    cancelMessage?: string;
+  }
+
+  let {
+    onSubmit,
+    onCancel,
+    message = 'Are you sure you want to reset completely to scratch?',
+    resetMessage = 'Reset',
+    cancelMessage = 'Cancel'
+  }: Props = $props();
 </script>
 
 <div class="root">
   <p>{message}</p>
   <div class="buttons-container">
-    <button on:click={onSubmit}>{resetMessage}</button>
-    <button on:click={onCancel}>{cancelMessage}</button>
+    <button onclick={onSubmit}>{resetMessage}</button>
+    <button onclick={onCancel}>{cancelMessage}</button>
   </div>
 </div>
 

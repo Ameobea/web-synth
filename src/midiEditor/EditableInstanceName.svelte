@@ -1,15 +1,30 @@
 <script lang="ts">
   import * as R from 'ramda';
 
-  export let name: string;
-  export let setName: (name: string) => void;
-  export let left: number | undefined = undefined;
-  export let right: number | undefined = undefined;
-  export let transparent = false;
+  interface Props {
+    name: string;
+    setName: (name: string) => void;
+    left?: number | undefined;
+    right?: number | undefined;
+    transparent?: boolean;
+  }
 
-  let isEditingName = false;
-  let nameWrapperHovered = false;
-  let editingNameValue = name;
+  let {
+    name,
+    setName,
+    left = undefined,
+    right = undefined,
+    transparent = false
+  }: Props = $props();
+
+  let isEditingName = $state(false);
+  let nameWrapperHovered = $state(false);
+  let editingNameValue = $state('');
+
+  const startEditing = () => {
+    editingNameValue = name;
+    isEditingName = true;
+  };
 </script>
 
 <div
@@ -17,10 +32,10 @@
   style="left: {R.isNil(left) ? 'unset' : `${left}px`}; right: {R.isNil(right)
     ? 'unset'
     : `${right}px`};"
-  on:mouseenter={() => {
+  onmouseenter={() => {
     nameWrapperHovered = true;
   }}
-  on:mouseleave={() => {
+  onmouseleave={() => {
     nameWrapperHovered = false;
   }}
   role="heading"
@@ -30,10 +45,10 @@
     <input
       type="text"
       bind:value={editingNameValue}
-      on:blur={() => {
+      onblur={() => {
         isEditingName = false;
       }}
-      on:keydown={e => {
+      onkeydown={e => {
         if (e.key === 'Enter') {
           e.stopPropagation();
           isEditingName = false;
@@ -45,7 +60,7 @@
           isEditingName = false;
         }
       }}
-      on:click={e => e.stopPropagation()}
+      onclick={e => e.stopPropagation()}
       class="name-input"
     />
   {:else}
@@ -58,17 +73,17 @@
     style="visibility: {nameWrapperHovered && !isEditingName
       ? 'visible'
       : 'hidden'}; font-size: var(--icon-font-size, 16px);"
-    on:click={e => {
+    onclick={e => {
       e.stopPropagation();
-      isEditingName = true;
+      startEditing();
     }}
     role="button"
     aria-label="Edit name"
     tabindex="0"
-    on:keydown={e => {
+    onkeydown={e => {
       if (e.key === 'Enter') {
         e.stopPropagation();
-        isEditingName = true;
+        startEditing();
       }
     }}
   >

@@ -2,9 +2,13 @@
   import type { SampleDescriptor } from 'src/sampleLibrary';
   import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 
-  export let onSamplePicked: (desc: SampleDescriptor) => void;
+  interface Props {
+    onSamplePicked: (desc: SampleDescriptor) => void;
+  }
 
-  let isPicking = false;
+  let { onSamplePicked }: Props = $props();
+
+  let isPicking = $state(false);
   const pickSample = async () => {
     isPicking = true;
     try {
@@ -16,7 +20,7 @@
 </script>
 
 <div class="root">
-  <button style="width: 140px" disabled={isPicking} on:click={pickSample}>Pick Sample</button>
+  <button style="width: 140px" disabled={isPicking} onclick={pickSample}>Pick Sample</button>
 </div>
 
 <style lang="css">

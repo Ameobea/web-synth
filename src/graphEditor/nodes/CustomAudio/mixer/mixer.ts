@@ -5,7 +5,7 @@ import MixerSmallView from './MixerSmallView.svelte';
 import { OverridableAudioNode, type OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 
 export const MAX_MIXER_TRACK_COUNT = 16;
 

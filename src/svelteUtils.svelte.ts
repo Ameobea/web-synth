@@ -1,17 +1,17 @@
-import React, { type JSXElementConstructor, type ReactElement, type RefObject } from 'react';
+import React, { type ReactElement, type RefObject } from 'react';
 import type { Unsubscribe as ReduxUnsubscribe, Store } from 'redux';
 import { getState, store, type ReduxStore } from 'src/redux';
-import { onDestroy, type SvelteComponent } from 'svelte';
+import { mount, unmount, onDestroy, type Component } from 'svelte';
 import { writable, type Writable } from 'svelte/store';
 
 import type { Subscriber, Unsubscriber, Updater } from 'svelte/store';
 
-const RenderedSvelteComponentsByDomID = new Map<string, SvelteComponent>();
+const RenderedSvelteComponentsByDomID = new Map<string, Record<string, any>>();
 
 type MkSvelteContainerRenderHelperArgs<Props extends Record<string, any>> = {
-  Comp: typeof SvelteComponent<Props>;
+  Comp: Component<Props>;
   getProps: () => Props;
-  predicate?: (comp: SvelteComponent) => void;
+  predicate?: (comp: Record<string, any>) => void;
 };
 
 export function mkSvelteContainerRenderHelper<Props extends Record<string, any | never>>({
@@ -28,7 +28,7 @@ export function mkSvelteContainerRenderHelper<Props extends Record<string, any |
 
     const props = getProps();
 
-    const BuiltComp = new Comp({ target: node, props });
+    const BuiltComp = mount(Comp, { target: node, props });
     RenderedSvelteComponentsByDomID.set(domID, BuiltComp);
 
     predicate?.(BuiltComp);
@@ -52,7 +52,8 @@ export const mkSvelteContainerCleanupHelper =
         console.error(`No built svelte component found with domID=${domID} when cleaning up`);
       }
     } else {
-      BuiltComp.$destroy();
+      RenderedSvelteComponentsByDomID.delete(domID);
+      void unmount(BuiltComp);
     }
 
     const node = document.getElementById(domID);
@@ -188,31 +189,15 @@ export function svelteStoreFromRedux<Slice>(
   return svelteStore;
 }
 
-export type SveltePropTypesOf<Comp> =
-  Comp extends SvelteComponent<infer Props>
-    ? Props
-    : // handle it being the class itself
-      Comp extends new (args: {
-          target: Element;
-          props: infer Props;
-        }) => SvelteComponent<infer Props>
-      ? Props
-      : never;
-
 /**
  * Creates a React component that renders the provided Svelte component.
- *
- * Adapted from: https://github.com/Rich-Harris/react-svelte/blob/master/index.js
  */
-export function mkSvelteComponentShim<Props extends Record<string, any>>(
-  Comp: typeof SvelteComponent<Props>
-) {
+export function mkSvelteComponentShim<Props extends Record<string, any>>(Comp: Component<Props>) {
   class SvelteComponentShim extends React.Component<Props> {
-    private instance: SvelteComponent<Props> | null = null;
-    private container: RefObject<ReactElement<Record<string, never>> | null>;
-    private div: ReactElement<{
-      ref: RefObject<ReactElement<Record<string, never>, string | JSXElementConstructor<any>> | null>;
-    }>;
+    private instance: Record<string, any> | null = null;
+    private setProps!: (newProps: Props) => void;
+    private container: RefObject<HTMLDivElement | null>;
+    private div: ReactElement;
 
     constructor(props: Props) {
       super(props);
@@ -222,18 +207,18 @@ export function mkSvelteComponentShim<Props extends Record<string, any>>(
     }
 
     componentDidMount() {
-      this.instance = new Comp({
-        target: this.container.current! as any,
-        props: this.props,
-      });
+      const props: Props = $state({ ...this.props });
+      this.setProps = newProps => void Object.assign(props, newProps);
+      this.instance = mount(Comp, { target: this.container.current!, props });
     }
 
     componentDidUpdate() {
-      this.instance!.$set(this.props);
+      this.setProps(this.props);
     }
 
     componentWillUnmount() {
-      this.instance!.$destroy();
+      void unmount(this.instance!);
+      this.instance = null;
     }
 
     render() {

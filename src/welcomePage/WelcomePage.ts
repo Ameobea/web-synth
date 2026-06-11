@@ -1,5 +1,5 @@
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 
 const buildWelcomePageDOMNodeID = (vcId: string) => `welcomePage-${vcId}`;
 

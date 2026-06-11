@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import SvelteControlPanel, {
     type ControlPanelSetting,
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
@@ -11,16 +11,27 @@
   import type { SamplerInstance } from 'src/sampler/SamplerInstance';
   import type { Writable } from 'svelte/store';
 
-  export let selection: SamplerSelection;
-  export let selectionIx: number;
-  export let onChange: (newSelection: SamplerSelection) => void;
-  export let inst: SamplerInstance;
-  export let getMidiGateStatusBufferF32: () => Float32Array | null;
-  export let midiGateStatusUpdated: Writable<number>;
+  interface Props {
+    selection: SamplerSelection;
+    selectionIx: number;
+    onChange: (newSelection: SamplerSelection) => void;
+    inst: SamplerInstance;
+    getMidiGateStatusBufferF32: () => Float32Array | null;
+    midiGateStatusUpdated: Writable<number>;
+  }
 
-  let isLearningMIDIMapping = false;
+  let {
+    selection,
+    selectionIx,
+    onChange,
+    inst,
+    getMidiGateStatusBufferF32,
+    midiGateStatusUpdated
+  }: Props = $props();
 
-  $: settings = ((): ControlPanelSetting[] => {
+  let isLearningMIDIMapping = $state(false);
+
+  let settings = $derived(((): ControlPanelSetting[] => {
     const settings: ControlPanelSetting[] = [{ label: 'name', type: 'text' }];
 
     if (selection.startSampleIx !== null && selection.endSampleIx !== null) {
@@ -51,16 +62,16 @@
     }
 
     return settings;
-  })();
+  })());
 
-  $: state = {
+  let cpState = $derived({
     name: selection.name ?? '',
     'start crossfade len samples': selection.startCrossfadeLenSamples,
     'end crossfade len samples': selection.endCrossfadeLenSamples,
     'midi number': selection.midiNumber,
     'playback rate': selection.playbackRate,
     reverse: selection.reverse,
-  };
+  });
 
   const handleChange = (key: string, val: any) => {
     const newSelection = { ...selection };
@@ -88,7 +99,7 @@
   };
 </script>
 
-<SvelteControlPanel {settings} onChange={handleChange} {state} style={{ width: 600 }} />
+<SvelteControlPanel {settings} onChange={handleChange} state={cpState} style={{ width: 600 }} />
 {#if isLearningMIDIMapping}
   <LearnMidiMapping
     {selectionIx}

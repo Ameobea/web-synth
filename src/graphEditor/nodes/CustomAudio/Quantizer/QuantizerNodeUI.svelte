@@ -1,4 +1,4 @@
-<script context="module" lang="ts">
+<script module lang="ts">
   import {
     QuantizeMode,
     tryParseCustomQuantizationIntervalValue,
@@ -29,10 +29,14 @@
 
   import type { QuantizerNodeUIState } from 'src/graphEditor/nodes/CustomAudio/Quantizer/types';
 
-  export let store: Writable<QuantizerNodeUIState>;
+  interface Props {
+    store: Writable<QuantizerNodeUIState>;
+  }
+
+  let { store }: Props = $props();
 
   const uniqueID = genRandomStringID();
-  let parseErrorMessage: string | null;
+  let parseErrorMessage: string | null = $state(null);
 
   const handleQuantizationIntervalTypeChange = (evt: { currentTarget: HTMLSelectElement }) => {
     const newInterval = evt.currentTarget.value;
@@ -81,7 +85,7 @@
         value={$store.quantizationInterval.type === 'custom'
           ? 'custom'
           : $store.quantizationInterval.value}
-        on:change={handleQuantizationIntervalTypeChange}
+        onchange={handleQuantizationIntervalTypeChange}
       >
         <option value="custom">Custom</option>
         {#each PRESET_INTERVALS as { name, interval }}
@@ -96,13 +100,13 @@
         <input
           type="text"
           bind:value={$store.customValueEntry}
-          on:keypress={evt => {
+          onkeypress={evt => {
             if (evt.key === 'Enter') {
               commitCustomIntervalValue();
             }
           }}
         />
-        <button on:click={commitCustomIntervalValue}>Submit</button>
+        <button onclick={commitCustomIntervalValue}>Submit</button>
       </div>
       {#if parseErrorMessage}
         <p class="parse-error-message">{parseErrorMessage}</p>

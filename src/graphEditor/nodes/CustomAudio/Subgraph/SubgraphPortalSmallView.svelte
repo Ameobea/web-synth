@@ -3,14 +3,25 @@
   import type { Writable } from 'svelte/store';
   import PortList from './PortList.svelte';
   import EditableInstanceName from 'src/midiEditor/EditableInstanceName.svelte';
-  import { svelteStoreFromRedux } from 'src/svelteUtils';
+  import { svelteStoreFromRedux } from 'src/svelteUtils.svelte';
 
-  export let inputs: Writable<PortMap>;
-  export let outputs: Writable<PortMap>;
-  export let renamePort: (side: 'input' | 'output', oldName: string, newName: string) => void;
-  export let deletePort: (side: 'input' | 'output', name: string) => void;
-  export let setSubgraphName: (newName: string) => void;
-  export let rxSubgraphID: string;
+  interface Props {
+    inputs: Writable<PortMap>;
+    outputs: Writable<PortMap>;
+    renamePort: (side: 'input' | 'output', oldName: string, newName: string) => void;
+    deletePort: (side: 'input' | 'output', name: string) => void;
+    setSubgraphName: (newName: string) => void;
+    rxSubgraphID: string;
+  }
+
+  let {
+    inputs,
+    outputs,
+    renamePort,
+    deletePort,
+    setSubgraphName,
+    rxSubgraphID
+  }: Props = $props();
 
   const subgraphName = svelteStoreFromRedux(
     state => state.viewContextManager.subgraphsByID[rxSubgraphID]?.name

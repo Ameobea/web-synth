@@ -8,7 +8,7 @@ import {
   type LFOConfig,
 } from 'src/graphEditor/nodes/CustomAudio/LFONode/LFOInstance';
 import LfoNodeSmallView from 'src/graphEditor/nodes/CustomAudio/LFONode/LFONodeUI/LFONodeSmallView.svelte';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 
 export interface LegacyLFOParams {

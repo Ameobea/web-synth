@@ -2,19 +2,23 @@
   import type { MappedSampleData } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
   import { getNoteColor, midiNumberToNoteName } from 'src/midiUtils';
 
-  export let midiNumber: number;
-  export let mappedSamples: MappedSampleData[] | undefined;
-  export let isGated: boolean;
-  let mappedSampleCount: number;
-  $: mappedSampleCount = mappedSamples?.filter(d => !!d.descriptor).length ?? 0;
+  interface Props {
+    midiNumber: number;
+    mappedSamples: MappedSampleData[] | undefined;
+    isGated: boolean;
+    onclick: (evt: MouseEvent) => void;
+  }
+
+  let { midiNumber, mappedSamples, isGated, onclick }: Props = $props();
+  let mappedSampleCount: number = $derived(mappedSamples?.filter(d => !!d.descriptor).length ?? 0);
 </script>
 
 <div
   class="note-row"
   data-color={getNoteColor(midiNumber)}
   data-gated={`${isGated}`}
-  on:click
-  on:keyup={() => {}}
+  {onclick}
+  onkeyup={() => {}}
   tabindex="0"
   role="button"
 >

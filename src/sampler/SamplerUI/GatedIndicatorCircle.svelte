@@ -1,4 +1,4 @@
-<div class="root" />
+<div class="root"></div>
 
 <style lang="css">
   .root {

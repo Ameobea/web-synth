@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: { src: resolve(__dirname, 'src') },
     },
-    json: { stringify: true },
+    json: { stringify: true, namedExports: false },
     publicDir: false,
     base: ASSET_PATH,
     define: {

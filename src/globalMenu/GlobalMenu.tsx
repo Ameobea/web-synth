@@ -21,7 +21,7 @@ import HamburgerMenuIcon from '../ViewContextManager/Icons/HamburgerMenu.svg';
 import HelpIcon from 'src/misc/HelpIcon';
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/types';
 import TapInBPMSvelte from './TapInBPM.svelte';
-import { mkSvelteComponentShim } from 'src/svelteUtils';
+import { mkSvelteComponentShim } from 'src/svelteUtils.svelte';
 import { globalTempoCSN, setGlobalBpm } from './globalTempo';
 
 const TapInBPM = mkSvelteComponentShim<{ onSubmit: (bpm: number) => void }>(TapInBPMSvelte);

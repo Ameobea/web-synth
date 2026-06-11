@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
       alias: { src: resolve(__dirname, 'src') },
     },
     // Large JSON (init-composition) ships as JSON.parse("...") which parses faster than an object literal
-    json: { stringify: true },
+    json: { stringify: true, namedExports: false },
     define: {
       'process.env.ASSET_PATH': JSON.stringify(env.ASSET_PATH || '/'),
       'process.env.BACKEND_BASE_URL': JSON.stringify(env.BACKEND_BASE_URL || ''),

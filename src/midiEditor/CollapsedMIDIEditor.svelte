@@ -7,18 +7,30 @@
   import EditableInstanceName from './EditableInstanceName.svelte';
   import SvelteDragHandle from 'src/midiEditor/SvelteDragHandle.svelte';
 
-  export let parentInstance: MIDIEditorInstance;
-  export let inst: ManagedMIDIEditorUIInstance;
-  export let pxPerBeat: Readable<number>;
-  export let scrollHorizontalBeats: Readable<number>;
-  export let expand: () => void;
-  export let instIx: number;
-  export let activateDrag: () => void;
+  interface Props {
+    parentInstance: MIDIEditorInstance;
+    inst: ManagedMIDIEditorUIInstance;
+    pxPerBeat: Readable<number>;
+    scrollHorizontalBeats: Readable<number>;
+    expand: () => void;
+    instIx: number;
+    activateDrag: () => void;
+  }
 
-  let minimapContainer: HTMLDivElement | null = null;
-  let svg: SVGSVGElement | null = null;
+  let {
+    parentInstance,
+    inst,
+    pxPerBeat,
+    scrollHorizontalBeats,
+    expand,
+    instIx,
+    activateDrag
+  }: Props = $props();
 
-  let windowWidth = 100;
+  let minimapContainer: HTMLDivElement | null = $state(null);
+  let svg: SVGSVGElement | null = $state(null);
+
+  let windowWidth = $state(100);
 
   // minimap SVG x positions are in beats, so we need to transform it so that it displays notes
   // scaled to match the zoom of the rest of the MIDI editor
@@ -27,32 +39,34 @@
   // in the SVG, but the SVG is 100vw wide, so we need to scale it by windowWidth / pxPerBeat.
   //
   // Y values are absolute, so we don't need to scale them.
-  $: if (svg) {
-    svg.setAttribute('width', `${windowWidth - 40}px`);
-    svg.setAttribute('height', '130px');
-    const pianoKeyboardWidthBeats = PIANO_KEYBOARD_WIDTH / $pxPerBeat;
-    svg.setAttribute(
-      'viewBox',
-      `${$scrollHorizontalBeats - pianoKeyboardWidthBeats} 0 ${(windowWidth - 40) / $pxPerBeat} 128`
-    );
-    svg.setAttribute('preserveAspectRatio', 'none');
-  }
+  $effect(() => {
+    if (svg) {
+      svg.setAttribute('width', `${windowWidth - 40}px`);
+      svg.setAttribute('height', '130px');
+      const pianoKeyboardWidthBeats = PIANO_KEYBOARD_WIDTH / $pxPerBeat;
+      svg.setAttribute(
+        'viewBox',
+        `${$scrollHorizontalBeats - pianoKeyboardWidthBeats} 0 ${(windowWidth - 40) / $pxPerBeat} 128`
+      );
+      svg.setAttribute('preserveAspectRatio', 'none');
+    }
+  });
 
-  $: {
+  $effect(() => {
     if (minimapContainer && inst.renderedMinimap) {
       minimapContainer.appendChild(inst.renderedMinimap);
       svg = inst.renderedMinimap;
     } else {
       svg = null;
     }
-  }
+  });
 </script>
 
 <svelte:window bind:innerWidth={windowWidth} />
 <div class="collapsed-midi-editor-instance">
   <button
     class="expand-midi-editor-instance"
-    on:click={() => parentInstance.uiManager.expandUIInstance(inst.id)}
+    onclick={() => parentInstance.uiManager.expandUIInstance(inst.id)}
     style="top: -1px;"
   >
     ›
@@ -60,7 +74,7 @@
   <SvelteDragHandle style={{ zIndex: 2, top: -1, left: 28, position: 'absolute' }} {activateDrag} />
   <button
     class="delete-cv-output-button"
-    on:click={() => parentInstance.uiManager.deleteMIDIEditorInstance(inst.id)}
+    onclick={() => parentInstance.uiManager.deleteMIDIEditorInstance(inst.id)}
     style={instIx === 0 ? 'right: 30px' : undefined}
   >
     ✕
@@ -74,9 +88,9 @@
   <div
     class="midi-editor-minimap-container"
     bind:this={minimapContainer}
-    on:dblclick={expand}
+    ondblclick={expand}
     role="figure"
-  />
+></div>
 </div>
 
 <style lang="css">

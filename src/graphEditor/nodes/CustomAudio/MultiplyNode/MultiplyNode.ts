@@ -5,7 +5,7 @@ import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio'
 import MultiplyNodeSmallView from 'src/graphEditor/nodes/CustomAudio/MultiplyNode/MultiplyNodeSmallView.svelte';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 
 export interface MultiplyNodeState {
   input: number;

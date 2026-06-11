@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const dpr = window.devicePixelRatio ?? 1;
 </script>
 
@@ -18,41 +18,59 @@
   import Cursor from 'src/midiEditor/CVOutput/Cursor.svelte';
   import SvelteDragHandle from 'src/midiEditor/SvelteDragHandle.svelte';
 
-  export let name: string;
-  export let setName: (name: string) => void;
-  export let state: Writable<CVOutputState>;
-  export let collapse: () => void;
-  export let deleteOutput: () => void;
-  export let registerInstance: (instance: ADSR2Instance) => void;
-  export let setFrozenOutputValue: (frozenOutputValue: number) => void;
-  export let view: MIDIEditorBaseView;
-  export let getCursorPosBeats: () => number;
-  export let setCursorPosBeats: (newCursorPosBeats: number) => void;
-  export let activateDrag: () => void;
+  interface Props {
+    name: string;
+    setName: (name: string) => void;
+    state: Writable<CVOutputState>;
+    collapse: () => void;
+    deleteOutput: () => void;
+    registerInstance: (instance: ADSR2Instance) => void;
+    setFrozenOutputValue: (frozenOutputValue: number) => void;
+    view: MIDIEditorBaseView;
+    getCursorPosBeats: () => number;
+    setCursorPosBeats: (newCursorPosBeats: number) => void;
+    activateDrag: () => void;
+  }
 
-  let width: number | undefined;
-  let widthObserver: ResizeObserver | undefined;
-  let widthObserverTarget: HTMLElement | undefined;
+  let {
+    name,
+    setName,
+    state: stateStore,
+    collapse,
+    deleteOutput,
+    registerInstance,
+    setFrozenOutputValue,
+    view,
+    getCursorPosBeats,
+    setCursorPosBeats,
+    activateDrag
+  }: Props = $props();
 
-  $: if (widthObserverTarget) {
-    widthObserver?.unobserve(widthObserverTarget);
-    widthObserver = new ResizeObserver(entries => {
+  let width: number | undefined = $state();
+  let widthObserverTarget: HTMLElement | undefined = $state();
+
+  $effect(() => {
+    if (!widthObserverTarget) {
+      return;
+    }
+    const widthObserver = new ResizeObserver(entries => {
       width = entries[0].contentRect.width - 43;
     });
     widthObserver.observe(widthObserverTarget);
-  }
+    return () => widthObserver.disconnect();
+  });
 
   const openSettings = () =>
-    renderModalWithControls(mkCVOutputSettingsPopup($state))
-      .then(newState => state.update(s => ({ ...s, ...newState })))
+    renderModalWithControls(mkCVOutputSettingsPopup($stateStore))
+      .then(newState => stateStore.update(s => ({ ...s, ...newState })))
       .catch(() => {});
 </script>
 
 <div class="root cv-output-controls" bind:this={widthObserverTarget}>
   <header
-    on:click={collapse}
+    onclick={collapse}
     tabindex="0"
-    on:keydown={e => e.key === 'Enter' && collapse()}
+    onkeydown={e => e.key === 'Enter' && collapse()}
     aria-label="Collapse"
     role="button"
   >
@@ -62,14 +80,14 @@
       style={{ zIndex: 2, top: 0, left: 28, position: 'absolute' }}
     />
     <EditableInstanceName {name} {setName} left={60} />
-    <button class="delete-cv-output-button" on:click={deleteOutput}>✕</button>
+    <button class="delete-cv-output-button" onclick={deleteOutput}>✕</button>
   </header>
 
   <div
     class="open-settings-button"
-    on:click={openSettings}
+    onclick={openSettings}
     tabindex="0"
-    on:keydown={e => e.key === 'Enter' && openSettings()}
+    onkeydown={e => e.key === 'Enter' && openSettings()}
     aria-label="Open settings"
     role="button"
   >
@@ -83,12 +101,12 @@
         height={220}
         debugName={`MIDI editor CV output ${name}`}
         initialState={{
-          ...$state.adsr,
-          outputRange: [$state.minValue, $state.maxValue],
+          ...$stateStore.adsr,
+          outputRange: [$stateStore.minValue, $stateStore.maxValue],
           lengthMode: AdsrLengthMode.Beats,
         }}
         onChange={newState => {
-          state.update(s => ({
+          stateStore.update(s => ({
             ...s,
             adsr: newState,
             minValue: newState.outputRange[0],

@@ -7,21 +7,20 @@
   import type { WavetableConfiguratorWorker } from 'src/fmSynth/Wavetable/WavetableConfiguratorWorker.worker';
   import { UnreachableError } from 'src/util';
 
-  export let preset: PresetDescriptor<WavetablePresetDescriptor>;
-  export let worker: Comlink.Remote<WavetableConfiguratorWorker>;
-
-  let lastPresetID: number | undefined = preset.preset.id;
-  let fetchedPreset = getWavetablePreset(preset.preset.id);
-  $: if (preset.preset.id !== lastPresetID) {
-    lastPresetID = preset.preset.id;
-    fetchedPreset = getWavetablePreset(preset.preset.id);
+  interface Props {
+    preset: PresetDescriptor<WavetablePresetDescriptor>;
+    worker: Comlink.Remote<WavetableConfiguratorWorker>;
   }
+
+  let { preset, worker }: Props = $props();
+
+  let fetchedPreset = $derived(getWavetablePreset(preset.preset.id));
 </script>
 
 {#await fetchedPreset}
   Loading...
 {:then preset}
-  <div class="spacer" style="height: 10px" />
+  <div class="spacer" style="height: 10px"></div>
   <BuildWavetable
     onSubmit={() => {
       throw new UnreachableError();

@@ -4,19 +4,22 @@
   const CANVAS_WIDTH = 400;
   const CANVAS_HEIGHT = 50;
 
-  export let phaseSAB: Float32Array;
-
-  let canvas: HTMLCanvasElement | null = null;
-  let ctx: CanvasRenderingContext2D | null = null;
-  $: if (canvas) {
-    ctx = canvas.getContext('2d');
+  interface Props {
+    phaseSAB: Float32Array;
   }
+
+  let { phaseSAB }: Props = $props();
+
+  let canvas: HTMLCanvasElement | null = $state(null);
+  let ctx: CanvasRenderingContext2D | null = $derived.by(() =>
+    canvas ? canvas.getContext('2d') : null
+  );
 
   let animationFrameHandle: number | null = null;
   onMount(() => {
     const cb = () => {
       if (!ctx) {
-        requestAnimationFrame(cb);
+        animationFrameHandle = requestAnimationFrame(cb);
         return;
       }
 
@@ -33,9 +36,9 @@
       ctx.stroke();
       ctx.closePath();
 
-      requestAnimationFrame(cb);
+      animationFrameHandle = requestAnimationFrame(cb);
     };
-    requestAnimationFrame(cb);
+    animationFrameHandle = requestAnimationFrame(cb);
 
     return () => {
       if (typeof animationFrameHandle === 'number') {
@@ -51,7 +54,7 @@
     height={CANVAS_HEIGHT}
     style={`width: ${CANVAS_WIDTH}px; height: ${CANVAS_HEIGHT}px;`}
     bind:this={canvas}
-  />
+></canvas>
 </div>
 
 <style lang="css">

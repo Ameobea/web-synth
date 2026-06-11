@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const buildSettings = (): ControlPanelSetting[] => [
     { type: 'checkbox', label: 'enable safety limiter' },
   ];
@@ -21,14 +21,18 @@
     'src/graphEditor/nodes/CustomAudio/mixer/MixerLevelsViz'
   ).then(m => m.MixerLevelsViz);
 
-  export let node: CustomDestinationNode;
-  export let state: Writable<CustomDestinationNodeState>;
-  export let sab: Writable<Float32Array | null>;
+  interface Props {
+    node: CustomDestinationNode;
+    state: Writable<CustomDestinationNodeState>;
+    sab: Writable<Float32Array | null>;
+  }
+
+  let { node, state: stateStore, sab }: Props = $props();
 
   const handleChange = (key: string, val: any, _state: any) => {
     switch (key) {
       case 'enable safety limiter':
-        $state.safetyLimiterEnabled = val;
+        $stateStore.safetyLimiterEnabled = val;
         node.setSafetyLimiterEnabled(val);
         break;
       default:
@@ -36,13 +40,13 @@
     }
   };
 
-  $: settings = buildSettings();
-  $: controlPanelState = { 'enable safety limiter': $state.safetyLimiterEnabled };
+  let settings = $derived(buildSettings());
+  let controlPanelState = $derived({ 'enable safety limiter': $stateStore.safetyLimiterEnabled });
 
-  let canvasRef: HTMLCanvasElement | null = null;
-  let vizInst: MixerLevelsViz | null = null;
+  let canvasRef: HTMLCanvasElement | null = $state(null);
+  let vizInst: MixerLevelsViz | null = $state(null);
 
-  $: {
+  $effect(() => {
     if (!canvasRef || !$sab) {
       vizInst?.destroy();
     } else {
@@ -56,7 +60,7 @@
         vizInst.setAudioThreadBuffer(sabVal);
       });
     }
-  }
+  });
 
   onDestroy(() => void vizInst?.destroy());
 </script>
@@ -69,8 +73,8 @@
     state={controlPanelState}
     onChange={handleChange}
   />
-  {#if $state.safetyLimiterEnabled && $sab}
-    <canvas bind:this={canvasRef} style="width: 500px; background: black; margin-top: -60px" />
+  {#if $stateStore.safetyLimiterEnabled && $sab}
+    <canvas bind:this={canvasRef} style="width: 500px; background: black; margin-top: -60px"></canvas>
   {/if}
 </div>
 

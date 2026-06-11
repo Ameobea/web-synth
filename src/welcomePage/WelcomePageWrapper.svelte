@@ -2,9 +2,13 @@
   import { createVcIsHiddenStore } from 'src/ViewContextManager/VcHideStatusRegistry';
   import WelcomePage from './WelcomePage.svelte';
 
-  export let vcId: string;
+  interface Props {
+    vcId: string;
+  }
 
-  $: isHiddenStore = createVcIsHiddenStore(vcId);
+  let { vcId }: Props = $props();
+
+  let isHiddenStore = $derived(createVcIsHiddenStore(vcId));
 </script>
 
 {#if !$isHiddenStore}

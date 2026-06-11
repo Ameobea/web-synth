@@ -2,19 +2,29 @@
   import GatedIndicatorCircle from 'src/sampler/SamplerUI/GatedIndicatorCircle.svelte';
   import type { SamplerSelection } from 'src/sampler/sampler';
 
-  export let activeSelectionIx: number | null;
-  export let onClick: () => void;
-  export let selection: SamplerSelection;
-  export let selectionIx: number;
-  export let isGated: boolean;
+  interface Props {
+    activeSelectionIx: number | null;
+    onClick: () => void;
+    selection: SamplerSelection;
+    selectionIx: number;
+    isGated: boolean;
+  }
+
+  let {
+    activeSelectionIx,
+    onClick,
+    selection,
+    selectionIx,
+    isGated
+  }: Props = $props();
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="generic-preset-picker-row"
   data-selected={`${activeSelectionIx === selectionIx}`}
-  on:click={onClick}
+  onclick={onClick}
 >
   {#if selection.name}
     {selection.name}

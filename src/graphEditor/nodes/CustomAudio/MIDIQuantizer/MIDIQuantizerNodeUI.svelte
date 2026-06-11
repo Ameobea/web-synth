@@ -1,4 +1,4 @@
-<script context="module">
+<script module>
   const WHITE_NOTES = [
     { name: 'C', index: 0 },
     { name: 'D', index: 2 },
@@ -25,7 +25,11 @@
   import Note from './Note.svelte';
   import { getIsGlobalBeatCounterStarted } from 'src/eventScheduler';
 
-  export let store: Writable<MIDIQuantizerNodeUIState>;
+  interface Props {
+    store: Writable<MIDIQuantizerNodeUIState>;
+  }
+
+  let { store }: Props = $props();
 
   const mkHandleNoteToggle = (index: number) => () =>
     ($store.activeNotes[index] = !$store.activeNotes[index]);
@@ -43,7 +47,7 @@
       <input
         type="checkbox"
         checked={$store.startOnGlobalStart}
-        on:change={evt => {
+        onchange={evt => {
           const newStartOnGlobalStart = !$store.startOnGlobalStart;
           $store.startOnGlobalStart = newStartOnGlobalStart;
           if (newStartOnGlobalStart) {
@@ -56,7 +60,7 @@
       />
     </div>
     {#if !$store.startOnGlobalStart}
-      <button class="start-stop-button" on:click={() => ($store.isRunning = !$store.isRunning)}>
+      <button class="start-stop-button" onclick={() => ($store.isRunning = !$store.isRunning)}>
         {$store.isRunning ? 'Stop' : 'Start'}
       </button>
     {/if}
@@ -67,14 +71,14 @@
       <button
         class="change-octave-range-button"
         disabled={$store.octaveRange[0] >= $store.octaveRange[1]}
-        on:click={() => ($store.octaveRange[0] += 1)}
+        onclick={() => ($store.octaveRange[0] += 1)}
       >
         +
       </button>
       <button
         class="change-octave-range-button"
         disabled={$store.octaveRange[0] <= -2}
-        on:click={() => ($store.octaveRange[0] -= 1)}
+        onclick={() => ($store.octaveRange[0] -= 1)}
       >
         -
       </button>
@@ -84,14 +88,14 @@
       <button
         class="change-octave-range-button"
         disabled={$store.octaveRange[1] >= 6}
-        on:click={() => ($store.octaveRange[1] += 1)}
+        onclick={() => ($store.octaveRange[1] += 1)}
       >
         +
       </button>
       <button
         class="change-octave-range-button"
         disabled={$store.octaveRange[1] <= $store.octaveRange[0]}
-        on:click={() => ($store.octaveRange[1] -= 1)}
+        onclick={() => ($store.octaveRange[1] -= 1)}
       >
         -
       </button>
@@ -109,7 +113,7 @@
             onClick={mkHandleNoteToggle(note.index)}>{note.name}</Note
           >
         {:else}
-          <div class="note-spacer" />
+          <div class="note-spacer"></div>
         {/if}
       {/each}
     </div>
@@ -174,7 +178,7 @@
     box-sizing: border-box;
   }
 
-  .active-note-selecg .note-row .note-spacer {
+  .active-note-select .note-row .note-spacer {
     width: 30px;
     height: 30px;
   }

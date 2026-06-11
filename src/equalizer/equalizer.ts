@@ -1,6 +1,6 @@
 import type { AudioConnectables } from 'src/patchNetwork';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import { buildDefaultEqualizerState, EqualizerInstance } from 'src/equalizer/EqualizerInstance';
 import { rwritable, type TransparentWritable } from 'src/util';
 import type { EqualizerFilterType } from 'src/equalizer/eqHelpers';

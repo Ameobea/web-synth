@@ -2,9 +2,13 @@
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { CompressorBandState } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
 
-  export let state: CompressorBandState;
-  export let onChange: (newState: CompressorBandState) => void;
-  export let ix: number;
+  interface Props {
+    state: CompressorBandState;
+    onChange: (newState: CompressorBandState) => void;
+    ix: number;
+  }
+
+  let { state, onChange, ix }: Props = $props();
 
   const MARGIN_TOP = 152;
   const VIZ_HEIGHT = 116;

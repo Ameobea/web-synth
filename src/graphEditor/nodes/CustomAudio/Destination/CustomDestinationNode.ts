@@ -3,7 +3,7 @@ import { Map as ImmMap } from 'immutable';
 
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import CustomDestinationNodeSmallView from './DestinationNodeSmallView.svelte';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { AsyncOnce } from 'src/util';

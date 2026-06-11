@@ -19,23 +19,36 @@
   import { onMount } from 'svelte';
   import { type Writable, get } from 'svelte/store';
 
-  export let activeSample: { descriptor: SampleDescriptor; data?: AudioBuffer } | null;
-  export let selections: Writable<SamplerSelection[]>;
-  export let activeSelectionIx: Writable<number | null>;
-  export let inst: SamplerInstance;
-  export let clearActiveSample: () => void;
-  export let waveformRenderer: WaveformRenderer;
-
-  $: if ($activeSelectionIx === null) {
-    waveformRenderer.setSelection({ endMarkPosMs: null, startMarkPosMs: null });
-  } else {
-    const selection = $selections[$activeSelectionIx];
-    waveformRenderer.setSelection({
-      startMarkPosMs:
-        selection.startSampleIx === null ? null : samplesToMs(selection.startSampleIx),
-      endMarkPosMs: selection.endSampleIx === null ? null : samplesToMs(selection.endSampleIx),
-    });
+  interface Props {
+    activeSample: { descriptor: SampleDescriptor; data?: AudioBuffer } | null;
+    selections: Writable<SamplerSelection[]>;
+    activeSelectionIx: Writable<number | null>;
+    inst: SamplerInstance;
+    clearActiveSample: () => void;
+    waveformRenderer: WaveformRenderer;
   }
+
+  let {
+    activeSample,
+    selections,
+    activeSelectionIx,
+    inst,
+    clearActiveSample,
+    waveformRenderer
+  }: Props = $props();
+
+  $effect(() => {
+    if ($activeSelectionIx === null) {
+      waveformRenderer.setSelection({ endMarkPosMs: null, startMarkPosMs: null });
+    } else {
+      const selection = $selections[$activeSelectionIx];
+      waveformRenderer.setSelection({
+        startMarkPosMs:
+          selection.startSampleIx === null ? null : samplesToMs(selection.startSampleIx),
+        endMarkPosMs: selection.endSampleIx === null ? null : samplesToMs(selection.endSampleIx),
+      });
+    }
+  });
 
   const onWaveformRendererSelectionChange = (newSelection: WaveformSelection) => {
     if ($activeSelectionIx === null) {
@@ -68,7 +81,7 @@
     inst.deleteSelection($activeSelectionIx);
   };
 
-  $: settings = ((): ControlPanelSetting[] =>
+  let settings = $derived(((): ControlPanelSetting[] =>
     filterNils([
       {
         type: 'button',
@@ -99,7 +112,7 @@
         },
         label: 'reset',
       },
-    ]))();
+    ]))());
 
   const handleSelectionChange = (newSelection: SamplerSelection) => {
     if ($activeSelectionIx === null) {

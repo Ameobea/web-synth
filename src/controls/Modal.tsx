@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './Modal.css';
-import type { SvelteComponent } from 'svelte';
+import { mount, unmount, type Component } from 'svelte';
 
 export interface ModalCompProps<T> {
   onSubmit: (val: T) => void;
@@ -55,7 +55,7 @@ export function renderModalWithControls<T>(
 }
 
 export function renderSvelteModalWithControls<T, Props extends ModalCompProps<T>>(
-  Comp: typeof SvelteComponent<ModalCompProps<T>>,
+  Comp: Component<ModalCompProps<T>>,
   clickBackdropToClose = true,
   extraProps?: Partial<Omit<Props, 'onSubmit' | 'onCancel'>>
 ): Promise<T> {
@@ -64,31 +64,34 @@ export function renderSvelteModalWithControls<T, Props extends ModalCompProps<T>
   bodyNode.appendChild(modalNode);
   modalNode.setAttribute('class', 'input-modal');
 
-  let inst: SvelteComponent<ModalCompProps<T>> | null = null;
-  const unmount = () => {
-    inst?.$destroy();
+  let inst: Record<string, any> | null = null;
+  const closeModal = () => {
+    if (inst) {
+      void unmount(inst);
+      inst = null;
+    }
     bodyNode.removeChild(modalNode);
   };
   if (clickBackdropToClose) {
     modalNode.addEventListener('mousedown', (e: MouseEvent) => {
       if (e.target === modalNode) {
-        unmount();
+        closeModal();
       }
     });
   }
 
   // Render the component into the modal and wait for its callback to be triggered
   return new Promise((resolve, reject) => {
-    inst = new Comp({
+    inst = mount(Comp, {
       target: modalNode,
       props: {
         onSubmit: (val: T) => {
           // Unmount the modal and resolve the `Promise`
-          unmount();
+          closeModal();
           resolve(val);
         },
         onCancel: () => {
-          unmount();
+          closeModal();
           reject();
         },
         ...(extraProps || {}),

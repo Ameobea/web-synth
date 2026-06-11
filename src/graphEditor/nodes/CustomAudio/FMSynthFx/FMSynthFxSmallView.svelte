@@ -6,12 +6,15 @@
   import type { FMSynthFxState } from 'src/graphEditor/nodes/CustomAudio/FMSynthFx/FMSynthFxNode';
   import type { Effect } from 'src/fmSynth/Effect';
 
-  export let store: Writable<FMSynthFxState>;
-  export let onChange: (ix: number, newState: Partial<Effect> | null) => void;
-  export let commitAll: () => void;
+  interface Props {
+    store: Writable<FMSynthFxState>;
+    onChange: (ix: number, newState: Partial<Effect> | null) => void;
+    commitAll: () => void;
+  }
 
-  let state: (Effect | null)[] = $store.effects;
-  $: state = $store.effects;
+  let { store, onChange, commitAll }: Props = $props();
+
+  let cpState: (Effect | null)[] = $derived($store.effects);
 
   const setOperatorEffects = (newFx: (Effect | null)[]) => {
     store.set({ effects: newFx });
@@ -29,9 +32,8 @@
 
 <div class="root">
   {#await ConfigureEffectsPromise then ConfigureEffects}
-    <svelte:component
-      this={ConfigureEffects}
-      {state}
+    <ConfigureEffects
+      state={cpState}
       {onChange}
       operatorIx={null}
       vcId={undefined}

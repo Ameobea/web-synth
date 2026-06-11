@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import type { Writable } from 'svelte/store';
 
   import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
@@ -12,13 +12,17 @@
 </script>
 
 <script lang="ts">
-  export let store: Writable<LineSpectrogramUIState>;
-  export let analyserNode: AnalyserNode;
+  interface Props {
+    store: Writable<LineSpectrogramUIState>;
+    analyserNode: AnalyserNode;
+  }
 
-  $: controlPanelState = {
+  let { store, analyserNode = $bindable() }: Props = $props();
+
+  let controlPanelState = $derived({
     'min/max dB': $store.rangeDb,
     'smoothing factor': $store.smoothingCoeff,
-  };
+  });
 
   const handleChange = (key: string, value: any) => {
     store.update(state => {

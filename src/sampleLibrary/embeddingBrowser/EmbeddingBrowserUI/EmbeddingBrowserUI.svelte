@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const LazyEmbeddingBrowserInst = new AsyncOnce(
     () =>
       import('src/sampleLibrary/embeddingBrowser/EmbeddingBrowserUI/EmbeddingBrowserInst').then(
@@ -20,14 +20,18 @@
   import { PlayingSampleManager } from 'src/sampleLibrary/SampleLibraryUI/PlayingSampleManager';
   import { AsyncOnce } from 'src/util';
 
-  export let embedding: AudioSampleEmbedding;
-  export let buildSampleDescriptor: (sampleName: string) => SampleDescriptor;
+  interface Props {
+    embedding: AudioSampleEmbedding;
+    buildSampleDescriptor: (sampleName: string) => SampleDescriptor;
+  }
 
-  let windowHeight = 0;
-  let windowWidth = 0;
+  let { embedding, buildSampleDescriptor }: Props = $props();
 
-  let container: HTMLDivElement | null = null;
-  let inst: EmbeddingBrowserInst | null = null;
+  let windowHeight = $state(0);
+  let windowWidth = $state(0);
+
+  let container: HTMLDivElement | null = $state(null);
+  let inst: EmbeddingBrowserInst | null = $state(null);
 
   const playingSampleManager = new PlayingSampleManager((_newPlayingSampleName: string) => {
     // playingSampleName = newPlayingSampleName;
@@ -40,31 +44,35 @@
     playingSampleManager.togglePlaying(sampleDescriptor);
   };
 
-  $: height = windowHeight - 220;
-  $: width = windowWidth - 500 - 80;
+  let height = $derived(windowHeight - 220);
+  let width = $derived(windowWidth - 500 - 80);
 
-  $: if (!inst && container && height > 0 && width > 0) {
-    LazyEmbeddingBrowserInst.get().then(EmbeddingBrowserInst => {
-      if (!container) {
-        console.error('container is null in EmbeddingBrowserUI');
-        return;
-      }
+  $effect(() => {
+    if (!inst && container && height > 0 && width > 0) {
+      LazyEmbeddingBrowserInst.get().then(EmbeddingBrowserInst => {
+        if (!container) {
+          console.error('container is null in EmbeddingBrowserUI');
+          return;
+        }
 
-      inst?.destroy();
-      inst = new EmbeddingBrowserInst({ container, embedding, clickHandler, height, width });
-    });
-  } else if (inst && !container) {
-    inst.destroy();
-    inst = null;
-  }
+        inst?.destroy();
+        inst = new EmbeddingBrowserInst({ container, embedding, clickHandler, height, width });
+      });
+    } else if (inst && !container) {
+      inst.destroy();
+      inst = null;
+    }
+  });
 
-  $: if (inst && height > 0 && width > 0) {
-    inst.resize(width, height);
-  }
+  $effect(() => {
+    if (inst && height > 0 && width > 0) {
+      inst.resize(width, height);
+    }
+  });
 </script>
 
 <svelte:window bind:innerHeight={windowHeight} bind:innerWidth={windowWidth} />
-<div class="container" bind:this={container} />
+<div class="container" bind:this={container}></div>
 
 <style lang="css">
   .container {

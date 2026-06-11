@@ -7,32 +7,48 @@
   import d3 from '../d3';
   import { getEqAxes } from 'src/equalizer/eqHelpers';
 
-  export let band: EqualizerBand;
-  export let bandIx: number;
-  export let isActive: boolean;
-  export let setActive: () => void;
-  export let onChange: (band: EqualizerBand) => void;
-  export let stageWidth: number;
-  export let stageHeight: number;
-  export let automationValsSAB: Float32Array | null;
-  export let automatedParams: { freq: number | null; gain: number | null; q: number | null };
-  export let eqUIHidden: boolean;
-  export let animateAutomatedParams: boolean;
+  interface Props {
+    band: EqualizerBand;
+    bandIx: number;
+    isActive: boolean;
+    setActive: () => void;
+    onChange: (band: EqualizerBand) => void;
+    stageWidth: number;
+    stageHeight: number;
+    automationValsSAB: Float32Array | null;
+    automatedParams: { freq: number | null; gain: number | null; q: number | null };
+    eqUIHidden: boolean;
+    animateAutomatedParams: boolean;
+  }
 
-  $: axesParams = getEqAxes(band.filterType);
+  let {
+    band,
+    bandIx,
+    isActive,
+    setActive,
+    onChange,
+    stageWidth,
+    stageHeight,
+    automationValsSAB,
+    automatedParams,
+    eqUIHidden,
+    animateAutomatedParams
+  }: Props = $props();
+
+  let axesParams = $derived(getEqAxes(band.filterType));
   const xParam = 'freq' as const;
-  $: yParam = axesParams.yParam;
-  $: yDomain = axesParams.yDomain;
-  $: scrollParam = axesParams.scrollParam;
-  $: scrollDomain = axesParams.scrollDomain;
+  let yParam = $derived(axesParams.yParam);
+  let yDomain = $derived(axesParams.yDomain);
+  let scrollParam = $derived(axesParams.scrollParam);
+  let scrollDomain = $derived(axesParams.scrollDomain);
 
-  $: xScale = d3.scaleLog().domain(EQ_X_DOMAIN).range([0, stageWidth]);
-  $: yScale = d3.scaleLinear().domain(yDomain).range([stageHeight, 0]);
+  let xScale = $derived(d3.scaleLog().domain(EQ_X_DOMAIN).range([0, stageWidth]));
+  let yScale = $derived(d3.scaleLinear().domain(yDomain).range([stageHeight, 0]));
 
-  $: canControlX = automatedParams[xParam] === null;
-  $: canControlY = automatedParams[yParam] === null;
+  let canControlX = $derived(automatedParams[xParam] === null);
+  let canControlY = $derived(automatedParams[yParam] === null);
 
-  $: computeHandlePos = (
+  let computeHandlePos = $derived((
     automatedParams: { freq: number | null; gain: number | null; q: number | null },
     yParam: 'gain' | 'q',
     band: EqualizerBand
@@ -48,25 +64,29 @@
         : clamp(yDomain[0], yDomain[1], automationValsSAB[automatedParams[yParam]!])
     );
     return { x: clamp(0, stageWidth, x), y: clamp(0, stageHeight, y) };
-  };
+  });
 
-  let position: { x: number; y: number } = { x: 0, y: 0 };
-  $: position = computeHandlePos(automatedParams, yParam, band);
+  let position: { x: number; y: number } = $state({ x: 0, y: 0 });
+  $effect(() => {
+    position = computeHandlePos(automatedParams, yParam, band);
+  });
 
-  let automationAnimationHandle: number | null = null;
-  $: if (eqUIHidden || (canControlX && canControlY)) {
-    if (automationAnimationHandle !== null) {
-      cancelAnimationFrame(automationAnimationHandle);
-      automationAnimationHandle = null;
-    }
-  } else {
-    if (automationAnimationHandle === null) {
-      automationAnimationHandle = requestAnimationFrame(() => {
-        position = computeHandlePos(automatedParams, yParam, band);
+  let automationAnimationHandle: number | null = $state(null);
+  $effect(() => {
+    if (eqUIHidden || (canControlX && canControlY)) {
+      if (automationAnimationHandle !== null) {
+        cancelAnimationFrame(automationAnimationHandle);
         automationAnimationHandle = null;
-      });
+      }
+    } else {
+      if (automationAnimationHandle === null) {
+        automationAnimationHandle = requestAnimationFrame(() => {
+          position = computeHandlePos(automatedParams, yParam, band);
+          automationAnimationHandle = null;
+        });
+      }
     }
-  }
+  });
 
   onDestroy(() => {
     if (automationAnimationHandle !== null) {
@@ -74,12 +94,12 @@
     }
   });
 
-  $: updateBandFromPosition = (band: EqualizerBand, x: number, y: number) => {
+  let updateBandFromPosition = $derived((band: EqualizerBand, x: number, y: number) => {
     const newBand = { ...band };
     newBand.frequency = clamp(EQ_X_DOMAIN[0], EQ_X_DOMAIN[1], xScale.invert(x));
     newBand[yParam] = clamp(yDomain[0], yDomain[1], yScale.invert(y));
     onChange(newBand);
-  };
+  });
 
   let dragState: {
     startPosLocal: { x: number; y: number };
@@ -125,7 +145,7 @@
     );
   };
 
-  $: handleScroll = (evt: WheelEvent) => {
+  let handleScroll = $derived((evt: WheelEvent) => {
     setActive();
     if (!scrollParam || !scrollDomain) {
       return;
@@ -136,7 +156,7 @@
     const deltaY = Math.sign(evt.deltaY) * -scrollMag;
     const newScrollParamVal = clamp(scrollDomain[0], scrollDomain[1], band[scrollParam] + deltaY);
     onChange({ ...band, [scrollParam]: newScrollParamVal });
-  };
+  });
 </script>
 
 <div
@@ -144,8 +164,8 @@
   style={`transform: translate(${position.x - 14}px, ${position.y - 14}px);`}
   style:border={isActive ? '2px dashed #fff' : 'none'}
   style:background={HANDLE_COLOR_BY_FILTER_TYPE[band.filterType]}
-  on:mousedown={handleMouseDown}
-  on:wheel={handleScroll}
+  onmousedown={handleMouseDown}
+  onwheel={handleScroll}
   role="button"
   tabindex="0"
 >

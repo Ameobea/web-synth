@@ -5,29 +5,39 @@
   import type { EqualizerBand } from 'src/equalizer/equalizer';
   import { EqualizerFilterType, getEqAxes } from 'src/equalizer/eqHelpers';
   import LineSpectrogramUi from 'src/visualizations/LineSpectrogram/LineSpectrogramUI.svelte';
-  import { derived } from 'svelte/store';
+  import { derived as derivedStore } from 'svelte/store';
 
-  export let inst: EqualizerInstance;
-  export let containerWidth: number;
-  export let containerHeight: number;
-  export let stageWidth: number;
-  export let stageHeight: number;
-  $: vcId = inst.vcId;
-  $: instStateStore = inst.state;
-  $: activeBandIx = $instStateStore.activeBandIx;
-  $: isBypassed = $instStateStore.isBypassed;
-  $: activeBandFilterType =
-    typeof activeBandIx === 'number' ? $instStateStore.bands[activeBandIx].filterType : null;
-  $: lineSpectrogramStore = derived(inst.state, state => state.lineSpectrogramUIState);
+  interface Props {
+    inst: EqualizerInstance;
+    containerWidth: number;
+    containerHeight: number;
+    stageWidth: number;
+    stageHeight: number;
+  }
+
+  let {
+    inst,
+    containerWidth,
+    containerHeight,
+    stageWidth,
+    stageHeight
+  }: Props = $props();
+  let vcId = $derived(inst.vcId);
+  let instStateStore = $derived(inst.state);
+  let activeBandIx = $derived($instStateStore.activeBandIx);
+  let isBypassed = $derived($instStateStore.isBypassed);
+  let activeBandFilterType =
+    $derived(typeof activeBandIx === 'number' ? $instStateStore.bands[activeBandIx].filterType : null);
+  let lineSpectrogramStore = $derived(derivedStore(inst.state, state => state.lineSpectrogramUIState));
   // non-null in any UI-mount path; `init_equalizer` skips the mount in headless
-  $: lineSpectrogram = inst.lineSpectrogram!;
+  let lineSpectrogram = $derived(inst.lineSpectrogram!);
 
-  let xAxisContainer: SVGGElement;
-  let yAxisContainer: SVGGElement;
-  let gridContainer: SVGGElement;
+  let xAxisContainer: SVGGElement | null = $state(null);
+  let yAxisContainer: SVGGElement | null = $state(null);
+  let gridContainer: SVGGElement | null = $state(null);
 
   const drawAxesAndGrid = (stageWidth: number, innerHeight: number) => {
-    if (stageWidth <= 0 || innerHeight <= 0) {
+    if (stageWidth <= 0 || innerHeight <= 0 || !xAxisContainer || !yAxisContainer || !gridContainer) {
       return;
     }
 
@@ -48,9 +58,11 @@
     d3.select(yAxisContainer).call(yAxis);
   };
 
-  $: drawAxesAndGrid(stageWidth, stageHeight);
+  $effect(() => {
+    drawAxesAndGrid(stageWidth, stageHeight);
+  });
 
-  $: y0Px = d3.scaleLinear().domain(EQ_GAIN_DOMAIN).range([stageHeight, 0])(0);
+  let y0Px = $derived(d3.scaleLinear().domain(EQ_GAIN_DOMAIN).range([stageHeight, 0])(0));
 
   const handleDoubleClick = (evt: MouseEvent) => {
     const rect = (evt.target as SVGElement).getBoundingClientRect();
@@ -92,12 +104,12 @@
       containerMargins={{ top: 0, left: 0, right: 0, bottom: 0 }}
     />
   </div>
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <svg
     class="eq-mag-response-plot"
     width={containerWidth}
     height={containerHeight}
-    on:dblclick={handleDoubleClick}
+    ondblclick={handleDoubleClick}
   >
     <g
       transform={`translate(${EQ_AXIS_MARGIN.left},${EQ_AXIS_MARGIN.top})`}

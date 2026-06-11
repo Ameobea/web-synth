@@ -4,7 +4,11 @@
   import LineSpectrogramUI from 'src/visualizations/LineSpectrogram/LineSpectrogramUI.svelte';
   import OscilloscopeUI from 'src/visualizations/Oscilloscope/OscilloscopeUI.svelte';
 
-  export let inst: SignalAnalyzerInst;
+  interface Props {
+    inst: SignalAnalyzerInst;
+  }
+
+  let { inst }: Props = $props();
 </script>
 
 <div class="root">

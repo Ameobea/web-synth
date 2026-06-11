@@ -15,7 +15,7 @@ import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { getSentry } from 'src/sentry';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import { AsyncOnce } from 'src/util';
 import MIDIQuantizerNodeUI from './MIDIQuantizerNodeUI.svelte';
 import { buildDefaultMIDIQuantizerNodeUIState, type MIDIQuantizerNodeUIState } from './types';

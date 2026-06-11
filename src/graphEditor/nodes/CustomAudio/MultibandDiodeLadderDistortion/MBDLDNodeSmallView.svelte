@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const settings: ControlPanelSetting[] = [
     { label: 'pre gain', type: 'range', min: 0, max: 3, step: 0.0001 },
     { label: 'post gain', type: 'range', min: 0, max: 3, step: 0.0001 },
@@ -28,37 +28,41 @@
     MBDLDNodeState,
   } from 'src/graphEditor/nodes/CustomAudio/MultibandDiodeLadderDistortion/MultibandDiodeLadderDistortionNode';
 
-  export let store: Writable<MBDLDNodeState>;
-  export let onChange: (
+  interface Props {
+    store: Writable<MBDLDNodeState>;
+    onChange: (
     band: 'low' | 'mid' | 'high',
     key: keyof MBDLDNodeBandState,
     val: number
   ) => void;
+  }
 
-  $: lowBandState = {
+  let { store, onChange }: Props = $props();
+
+  let lowBandState = $derived({
     'pre gain': $store.low.preGain,
     'post gain': $store.low.postGain,
     q: $store.low.Q,
     'normalized frequency': $store.low.normalizedFrequency,
     wet: $store.low.wet,
     dry: $store.low.dry,
-  };
-  $: midBandState = {
+  });
+  let midBandState = $derived({
     'pre gain': $store.mid.preGain,
     'post gain': $store.mid.postGain,
     q: $store.mid.Q,
     'normalized frequency': $store.mid.normalizedFrequency,
     wet: $store.mid.wet,
     dry: $store.mid.dry,
-  };
-  $: highBandState = {
+  });
+  let highBandState = $derived({
     'pre gain': $store.high.preGain,
     'post gain': $store.high.postGain,
     q: $store.high.Q,
     'normalized frequency': $store.high.normalizedFrequency,
     wet: $store.high.wet,
     dry: $store.high.dry,
-  };
+  });
 
   const handleLowBandChange = (key: string, val: number) => onChange('low', mapKey(key), val);
   const handleMidBandChange = (key: string, val: number) => onChange('mid', mapKey(key), val);

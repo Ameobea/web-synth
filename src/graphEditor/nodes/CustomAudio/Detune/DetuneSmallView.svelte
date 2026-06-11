@@ -3,10 +3,15 @@
   import type { DetuneNode } from './DetuneNode';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 
-  export let node: DetuneNode;
+  interface Props {
+    node: DetuneNode;
+  }
 
-  let settings: ControlPanelSetting[] = [];
-  $: settings = [{ label: 'detune (cents)', type: 'range', min: -1200, max: 1200, step: 1 }];
+  let { node }: Props = $props();
+
+  const settings: ControlPanelSetting[] = [
+    { label: 'detune (cents)', type: 'range', min: -1200, max: 1200, step: 1 },
+  ];
 
   const handleChange = (key: string, value: any) => {
     switch (key) {
@@ -18,14 +23,14 @@
     }
   };
 
-  $: stateStore = node.state;
-  $: nodeState = $stateStore;
+  let stateStore = $derived(node.state);
+  let nodeState = $derived($stateStore);
 
-  $: state = { 'detune (cents)': nodeState.detuneCents };
+  let cpState = $derived({ 'detune (cents)': nodeState.detuneCents });
 </script>
 
 <div class="root">
-  <SvelteControlPanel {settings} {state} onChange={handleChange} width={500} />
+  <SvelteControlPanel {settings} state={cpState} onChange={handleChange} width={500} />
 </div>
 
 <style lang="css">

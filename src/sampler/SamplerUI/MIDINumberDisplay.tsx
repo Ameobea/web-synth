@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMappedWritableValue } from 'src/reactUtils';
 import GatedIndicatorCircleSvelte from 'src/sampler/SamplerUI/GatedIndicatorCircle.svelte';
-import { mkSvelteComponentShim } from 'src/svelteUtils';
+import { mkSvelteComponentShim } from 'src/svelteUtils.svelte';
 import type { Writable } from 'svelte/store';
 
 interface MIDINumberDisplayProps {

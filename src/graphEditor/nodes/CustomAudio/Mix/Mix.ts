@@ -1,7 +1,7 @@
 import { Map as ImmMap } from 'immutable';
 
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import MixSmallView from './MixSmallView.svelte';

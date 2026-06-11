@@ -14,12 +14,20 @@
   const LINE_WIDTH = 1;
   const CROSSHAIR_COLOR = '#aaaaaa77';
 
-  export let responsePlot: Writable<ResponsePlotData | null>;
+  interface Props {
+    responsePlot: Writable<ResponsePlotData | null>;
+  }
 
-  let svg: SVGSVGElement;
-  let hoveredValue: { x: number; y: number } | null = null;
+  let { responsePlot }: Props = $props();
+
+  let svg: SVGSVGElement | null = $state(null);
+  let hoveredValue: { x: number; y: number } | null = $state(null);
 
   onMount(() => {
+    if (!svg) {
+      return;
+    }
+
     const xScale = d3.scaleLinear().range([0, INNER_WIDTH]);
     const yScale = d3.scaleLinear().range([INNER_HEIGHT, 0]);
 

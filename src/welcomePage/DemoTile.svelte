@@ -8,16 +8,29 @@
   import { getEngine } from 'src/util';
   import { setGlobalVolume } from '../ViewContextManager/globalVolume';
 
-  export let title: string;
-  export let description: string;
-  export let compositionID: string;
-  export let image: string;
-  export let imageWidth: number;
-  export let imageHeight: number;
-  export let imageAlt: string;
-  export let isLoadingComposition: boolean;
+  interface Props {
+    title: string;
+    description: string;
+    compositionID: string;
+    image: string;
+    imageWidth: number;
+    imageHeight: number;
+    imageAlt: string;
+    isLoadingComposition: boolean;
+  }
 
-  let thisCompositionLoading = false;
+  let {
+    title,
+    description,
+    compositionID,
+    image,
+    imageWidth,
+    imageHeight,
+    imageAlt,
+    isLoadingComposition = $bindable()
+  }: Props = $props();
+
+  let thisCompositionLoading = $state(false);
 
   const loadComposition = async () => {
     if (isLoadingComposition) {
@@ -49,9 +62,9 @@
 <div
   class="root"
   role="link"
-  on:click={loadComposition}
+  onclick={loadComposition}
   tabindex="0"
-  on:keydown={e => {
+  onkeydown={e => {
     if (e.key === 'Enter') {
       loadComposition();
     }

@@ -7,14 +7,18 @@
   } from 'src/graphEditor/nodes/CustomAudio/LFONode/LFOInstance';
   import LfoPhaseViz from 'src/graphEditor/nodes/CustomAudio/LFONode/LFONodeUI/LFOPhaseViz.svelte';
 
-  export let inst: LFOInstance;
+  interface Props {
+    inst: LFOInstance;
+  }
 
-  $: stateStore = inst.state;
-  $: state = $stateStore;
-  $: phaseSABStore = inst.phaseSAB;
-  $: phaseSAB = $phaseSABStore;
+  let { inst }: Props = $props();
 
-  $: settings = (() => {
+  let stateStore = $derived(inst.state);
+  let state = $derived($stateStore);
+  let phaseSABStore = $derived(inst.phaseSAB);
+  let phaseSAB = $derived($phaseSABStore);
+
+  let settings = $derived((() => {
     const settings: ControlPanelSetting[] = [
       {
         type: 'select',
@@ -57,16 +61,16 @@
     }
 
     return settings;
-  })();
+  })());
 
-  $: controlPanelState = {
+  let controlPanelState = $derived({
     waveform: state.oscillator.type,
     frequency: state.frequency,
     'start phase': state.phaseInit.startPhase,
     'reset phase on playback start': state.phaseInit.setPhaseOnPlaybackStart,
     'duty cycle':
       state.oscillator.type === OscillatorType.Square ? state.oscillator.dutyCycle : null,
-  };
+  });
 
   const handleChange = (key: string, value: any) => {
     switch (key) {

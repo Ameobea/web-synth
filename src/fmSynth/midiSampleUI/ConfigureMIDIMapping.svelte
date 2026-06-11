@@ -7,15 +7,19 @@
     type MappedSampleData,
   } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
 
-  export let mappedSamples: MappedSampleData[] = [];
-  export let onClose: () => void;
+  interface Props {
+    mappedSamples?: MappedSampleData[];
+    onClose: () => void;
+  }
+
+  let { mappedSamples = $bindable([]), onClose }: Props = $props();
 </script>
 
 <div class="root">
   <div class="mapped-samples-container">
-    {#each mappedSamples as mappedSampleData, i}
+    {#each mappedSamples as _, i}
       <ConfigureMappedSample
-        bind:mappedSampleData
+        bind:mappedSampleData={mappedSamples[i]}
         onDelete={() => {
           mappedSamples = R.remove(i, 1, mappedSamples);
         }}
@@ -24,11 +28,11 @@
   </div>
   <button
     class="add-mapped-sample-button"
-    on:click={() => (mappedSamples = [...mappedSamples, buildDefaultMappedSampleData()])}
+    onclick={() => (mappedSamples = [...mappedSamples, buildDefaultMappedSampleData()])}
   >
     Add Mapped Sample
   </button>
-  <button class="close-button" on:click={onClose}>Collapse</button>
+  <button class="close-button" onclick={onClose}>Collapse</button>
 </div>
 
 <style lang="css">

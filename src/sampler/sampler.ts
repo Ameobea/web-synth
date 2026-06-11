@@ -1,7 +1,7 @@
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import type { SampleDescriptor } from 'src/sampleLibrary';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import { Map as ImmMap } from 'immutable';
 import { SamplerInstance } from 'src/sampler/SamplerInstance';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';

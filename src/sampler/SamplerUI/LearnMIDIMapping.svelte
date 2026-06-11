@@ -3,16 +3,25 @@
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
 
-  export let selectionIx: number;
-  export let inst: SamplerInstance;
-  export let onLearned: (midiNumber: number) => void;
-  export let onCanceled: () => void;
-  $: selections = inst.selections;
+  interface Props {
+    selectionIx: number;
+    inst: SamplerInstance;
+    onLearned: (midiNumber: number) => void;
+    onCanceled: () => void;
+  }
 
-  let capturedMIDINumber: number | null = null;
-  $: conflictingSelectionIx = $selections.findIndex(
+  let {
+    selectionIx,
+    inst,
+    onLearned,
+    onCanceled
+  }: Props = $props();
+  let selections = $derived(inst.selections);
+
+  let capturedMIDINumber: number | null = $state(null);
+  let conflictingSelectionIx = $derived($selections.findIndex(
     (sel, ix) => ix !== selectionIx && sel.midiNumber === capturedMIDINumber
-  );
+  ));
 
   onMount(async () => {
     while (true) {
@@ -39,7 +48,7 @@
     </p>
   {/if}
 
-  <button on:click={onCanceled} style="width: 80px">Cancel</button>
+  <button onclick={onCanceled} style="width: 80px">Cancel</button>
 </div>
 
 <style lang="css">

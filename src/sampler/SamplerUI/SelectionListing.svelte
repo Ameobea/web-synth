@@ -4,17 +4,27 @@
   import SelectionListingItem from 'src/sampler/SamplerUI/SelectionListingItem.svelte';
   import type { Writable } from 'svelte/store';
 
-  export let selections: SamplerSelection[];
-  export let activeSelectionIx: number | null;
-  export let setActiveSelectionIx: (ix: number | null) => void;
-  export let getMidiGateStatusBufferF32: () => Float32Array | null;
-  export let midiGateStatusUpdated: Writable<number>;
+  interface Props {
+    selections: SamplerSelection[];
+    activeSelectionIx: number | null;
+    setActiveSelectionIx: (ix: number | null) => void;
+    getMidiGateStatusBufferF32: () => Float32Array | null;
+    midiGateStatusUpdated: Writable<number>;
+  }
+
+  let {
+    selections,
+    activeSelectionIx,
+    setActiveSelectionIx,
+    getMidiGateStatusBufferF32,
+    midiGateStatusUpdated
+  }: Props = $props();
 
   // dummy dependency to force reactivity
   const getIsSelectionGated = (_midiGateStatusUpdated: number, sel: SamplerSelection): boolean =>
     typeof sel.midiNumber === 'number' && !!getMidiGateStatusBufferF32()?.[sel.midiNumber];
 
-  $: isGatedBySelectionIx = selections.map(sel => getIsSelectionGated($midiGateStatusUpdated, sel));
+  let isGatedBySelectionIx = $derived(selections.map(sel => getIsSelectionGated($midiGateStatusUpdated, sel)));
 </script>
 
 <div class="root preset-list">

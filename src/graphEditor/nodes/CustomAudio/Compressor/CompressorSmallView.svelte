@@ -9,7 +9,11 @@
     type CompressorNodeUIState,
   } from 'src/graphEditor/nodes/CustomAudio/Compressor/CompressorNode';
 
-  export let store: Writable<CompressorNodeUIState>;
+  interface Props {
+    store: Writable<CompressorNodeUIState>;
+  }
+
+  let { store }: Props = $props();
 
   const MultibandCompressorControlsPromise = import('src/controls/MultibandCompressor');
 
@@ -65,7 +69,7 @@
       width={500}
       height={930}
       style="min-width: 500px; min-height: 930px"
-    />
+></canvas>
   {/await}
 
   <CompressorControlPanel

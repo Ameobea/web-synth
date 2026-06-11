@@ -3,16 +3,25 @@
   import type { PortMap } from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalNode';
   import type { Writable } from 'svelte/store';
 
-  export let title: string;
-  export let ports: Writable<PortMap>;
-  export let renamePort: (oldName: string, newName: string) => void;
-  export let deletePort: (name: string) => void;
+  interface Props {
+    title: string;
+    ports: Writable<PortMap>;
+    renamePort: (oldName: string, newName: string) => void;
+    deletePort: (name: string) => void;
+  }
 
-  $: sortedPorts = (() => {
+  let {
+    title,
+    ports,
+    renamePort,
+    deletePort
+  }: Props = $props();
+
+  let sortedPorts = $derived((() => {
     const entries = Object.entries($ports);
     entries.sort(([a], [b]) => a.localeCompare(b));
     return entries;
-  })();
+  })());
 </script>
 
 <div class="root">

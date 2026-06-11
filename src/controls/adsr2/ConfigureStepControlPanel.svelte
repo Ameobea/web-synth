@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 
@@ -9,19 +9,33 @@
 </script>
 
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { filterNils, samplesToMs } from 'src/util';
 
-  export let top: number;
-  export let left: number;
-  export let step: { x: number; y: number };
-  export let outputRange: readonly [number, number];
-  export let length:
+  interface Props {
+    top: number;
+    left: number;
+    step: { x: number; y: number };
+    outputRange: readonly [number, number];
+    length:
     | { type: 'samples'; value: number }
     | { type: 'beats'; value: number }
     | { type: 'ms'; value: number };
-  export let onSubmit: (newStep: { x: number; y: number }) => void;
-  export let onCancel: () => void;
-  export let enableY = true;
+    onSubmit: (newStep: { x: number; y: number }) => void;
+    onCancel: () => void;
+    enableY?: boolean;
+  }
+
+  let {
+    top,
+    left,
+    step,
+    outputRange,
+    length,
+    onSubmit,
+    onCancel,
+    enableY = true
+  }: Props = $props();
 
   const { normalizedToLocalX, localToNormalizedX } = (() => {
     switch (length.type) {
@@ -56,42 +70,42 @@
     },
   };
 
-  const settings: ControlPanelSetting[] = filterNils([
+  const settings: ControlPanelSetting[] = $derived(filterNils([
     { type: 'range', label: 'x', min: 0, max: normalizedToLocalX(1) },
     enableY ? { type: 'range', label: 'y', min: 0, max: normalizedToLocalY(1) } : null,
-    { type: 'button', label: 'cancel', action: onCancel },
+    { type: 'button', label: 'cancel', action: () => onCancel() },
     {
       type: 'button',
       label: 'submit',
       action: () => {
         const newStep = {
-          x: localToNormalizedX(state.x),
-          y: localToNormalizedY(state.y),
+          x: localToNormalizedX(cpState.x),
+          y: localToNormalizedY(cpState.y),
         };
         onSubmit(newStep);
       },
     },
-  ]);
+  ]));
 
-  let state: LocalState = {
-    x: normalizedToLocalX(step.x),
-    y: normalizedToLocalY(step.y),
-  };
+  let cpState: LocalState = $state({
+    x: normalizedToLocalX(untrack(() => step.x)),
+    y: normalizedToLocalY(untrack(() => step.y)),
+  });
 
   const handleChange = (_key: string, _val: any, newState: any) => {
-    state = newState;
+    cpState = newState;
   };
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="adsr2-configure-step-control-panel"
   style="top:{top}px; left:{left}px;"
-  on:contextmenu={e => e.preventDefault()}
+  oncontextmenu={e => e.preventDefault()}
 >
   <SvelteControlPanel
     {settings}
-    {state}
+    state={cpState}
     onChange={handleChange}
     theme={{ background1: '#141414' }}
   />

@@ -20,7 +20,7 @@ import { MIDIEditorControlButton } from 'src/midiEditor/MIDIEditorControlButton'
 import BasicModal from 'src/misc/BasicModal';
 import { mkImageLoadPlaceholder, useWindowSize } from 'src/reactUtils';
 import { getIsVcHidden } from 'src/ViewContextManager/VcHideStatusRegistry';
-import { mkSvelteComponentShim } from 'src/svelteUtils';
+import { mkSvelteComponentShim } from 'src/svelteUtils.svelte';
 import { MIDIWasmModule } from 'src/midiWasmModule';
 import { clamp } from 'src/util';
 import type { ADSR2Instance } from 'src/controls/adsr2/adsr2';

@@ -3,18 +3,29 @@
     type ControlPanelSetting,
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { RampFn } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
+  import { untrack } from 'svelte';
   import { get, writable, type Writable } from 'svelte/store';
 
-  export let top: number;
-  export let left: number;
-  export let onCancel: () => void;
-  export let onSubmit: (newRampFnType: RampFn['type']) => void;
-  export let initialRampFnType: RampFn['type'];
+  interface Props {
+    top: number;
+    left: number;
+    onCancel: () => void;
+    onSubmit: (newRampFnType: RampFn['type']) => void;
+    initialRampFnType: RampFn['type'];
+  }
+
+  let {
+    top,
+    left,
+    onCancel,
+    onSubmit,
+    initialRampFnType
+  }: Props = $props();
 
   interface LocalState {
     'ramp fn': RampFn['type'];
   }
-  let state: Writable<LocalState> = writable({ 'ramp fn': initialRampFnType });
+  let state: Writable<LocalState> = writable({ 'ramp fn': untrack(() => initialRampFnType) });
 
   const handleSubmit = () => void onSubmit(get(state)['ramp fn']);
 
@@ -24,7 +35,7 @@
       label: 'ramp fn',
       options: ['linear', 'exponential', 'bezier', 'instant'],
     },
-    { type: 'button', label: 'cancel', action: onCancel },
+    { type: 'button', label: 'cancel', action: () => onCancel() },
     {
       type: 'button',
       label: 'submit',
@@ -35,11 +46,11 @@
   const handleChange = (key: string, val: any) => state.update(s => ({ ...s, [key]: val }));
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="adsr2-configure-ramp-control-panel"
   style="top:{top}px; left:{left}px;"
-  on:contextmenu={e => e.preventDefault()}
+  oncontextmenu={e => e.preventDefault()}
 >
   <SvelteControlPanel
     {settings}

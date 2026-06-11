@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import { filterNils } from 'src/util';
 
   const buildMappedSampleControlPanelSettings = (
@@ -21,26 +21,33 @@
   import { getSample } from 'src/sampleLibrary/sampleLibrary';
   import { selectSample } from 'src/sampleLibrary/SampleLibraryUI/SelectSample';
 
-  export let mappedSampleData: MappedSampleData;
-  export let onDelete: () => void;
-
-  $: selectedSampleLength = 0;
-  $: if (mappedSampleData.descriptor) {
-    getSample(mappedSampleData.descriptor).then(sample => {
-      selectedSampleLength = sample.length;
-    });
-  } else {
-    selectedSampleLength = 0;
+  interface Props {
+    mappedSampleData: MappedSampleData;
+    onDelete: () => void;
   }
-  $: mappedSampleControlPanelSettings = buildMappedSampleControlPanelSettings(selectedSampleLength);
-  $: controlPanelState = {
+
+  let { mappedSampleData = $bindable(), onDelete }: Props = $props();
+
+  let selectedSampleLength = $state(0);
+
+  $effect(() => {
+    if (mappedSampleData.descriptor) {
+      getSample(mappedSampleData.descriptor).then(sample => {
+        selectedSampleLength = sample.length;
+      });
+    } else {
+      selectedSampleLength = 0;
+    }
+  });
+  let mappedSampleControlPanelSettings = $derived(buildMappedSampleControlPanelSettings(selectedSampleLength));
+  let controlPanelState = $derived({
     gain: mappedSampleData.gain ?? 1,
     'playback rate': mappedSampleData.playbackRate ?? 1,
     'range (samples)': [
       mappedSampleData.startIx ?? 0,
       mappedSampleData.endIx ?? selectedSampleLength,
     ],
-  };
+  });
 
   const checkboxID = `loop-checkbox-${genRandomStringID()}`;
 
@@ -72,7 +79,7 @@
   <div class="buttons-container">
     <button
       class="select-sample-button"
-      on:click={async () => {
+      onclick={async () => {
         try {
           const selectedSample = await selectSample();
           mappedSampleData.descriptor = selectedSample;
@@ -84,7 +91,7 @@
     >
       Pick Sample
     </button>
-    <button style="margin-left: 8px;" on:click={onDelete}>Delete</button>
+    <button style="margin-left: 8px;" onclick={onDelete}>Delete</button>
     <label class="loop-checkbox-label" for={checkboxID}>Loop</label>
     <input id={checkboxID} type="checkbox" bind:checked={mappedSampleData.doLoop} />
     {#if mappedSampleData.descriptor}

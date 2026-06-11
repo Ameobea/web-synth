@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import type { Readable } from 'svelte/store';
 
   import type { LineSpectrogram } from 'src/visualizations/LineSpectrogram/LineSpectrogram';
@@ -8,70 +8,87 @@
 
   let LineSpectrumUIInstComp:
     | typeof import('src/visualizations/LineSpectrogram/LineSpectrogramUIInst').LineSpectrumUIInst
-    | null = null;
+    | null = $state(null);
   onMount(() =>
     import('src/visualizations/LineSpectrogram/LineSpectrogramUIInst').then(module => {
       LineSpectrumUIInstComp = module.LineSpectrumUIInst;
     })
   );
 
-  export let inst: LineSpectrogram;
-  export let store: Readable<LineSpectrogramUIState>;
-  export let forcedWidth: number | undefined = undefined;
-  export let forcedHeight: number | undefined = undefined;
-  export let enableAxes: boolean = true;
-  export let containerMargins: {
+  interface Props {
+    inst: LineSpectrogram;
+    store: Readable<LineSpectrogramUIState>;
+    forcedWidth?: number | undefined;
+    forcedHeight?: number | undefined;
+    enableAxes?: boolean;
+    containerMargins?: {
     left: number;
     right: number;
     top: number;
     bottom: number;
-  } = { left: 30, right: 0, top: 8, bottom: 16 };
+  };
+  }
+
+  let {
+    inst,
+    store,
+    forcedWidth = undefined,
+    forcedHeight = undefined,
+    enableAxes = true,
+    containerMargins = { left: 30, right: 0, top: 8, bottom: 16 }
+  }: Props = $props();
 
   const dpr = Math.floor(window.devicePixelRatio || 1);
-  let windowWidth = 100;
-  let windowHeight = 100;
-  $: width = (() => {
+  let windowWidth = $state(100);
+  let windowHeight = $state(100);
+  let width = $derived((() => {
     if (typeof forcedWidth === 'number') {
       return Math.floor(forcedWidth);
     }
     const baseWidth = Math.floor(windowWidth * 0.75);
     const remainder = baseWidth % dpr;
     return baseWidth - remainder;
-  })();
-  $: height = (() => {
+  })());
+  let height = $derived((() => {
     if (typeof forcedHeight === 'number') {
       return Math.floor(forcedHeight);
     }
     const baseHeight = Math.max(Math.floor(windowHeight - 122 - 82 - 340), 350);
     const remainder = baseHeight % dpr;
     return baseHeight - remainder;
-  })();
+  })());
 
-  let container: HTMLDivElement | null = null;
-  let uiInst: LineSpectrumUIInst | null = null;
-  $: if (container && LineSpectrumUIInstComp) {
-    uiInst?.destroy();
-    uiInst = new LineSpectrumUIInstComp(
-      container,
-      { width, height },
-      $store.rangeDb[0],
-      $store.rangeDb[1],
-      enableAxes
-    );
-  }
+  let container: HTMLDivElement | null = $state(null);
+  let uiInst: LineSpectrumUIInst | null = $state(null);
+  $effect(() => {
+    if (container && LineSpectrumUIInstComp) {
+      untrack(() => uiInst?.destroy());
+      uiInst = new LineSpectrumUIInstComp(
+        container,
+        { width, height },
+        $store.rangeDb[0],
+        $store.rangeDb[1],
+        enableAxes
+      );
+    }
+  });
   onDestroy(() => {
     uiInst?.destroy();
   });
 
   let lastWidth = -1;
   let lastHeight = -1;
-  $: if (lastWidth !== width || lastHeight !== height) {
-    inst.resizeView(width, height);
-    uiInst?.updateSize({ width, height });
-    lastWidth = width;
-    lastHeight = height;
-  }
-  $: uiInst?.updateYRange($store.rangeDb[0], $store.rangeDb[1]);
+  $effect(() => {
+    if (lastWidth !== width || lastHeight !== height) {
+      inst.resizeView(width, height);
+      uiInst?.updateSize({ width, height });
+      lastWidth = width;
+      lastHeight = height;
+    }
+  });
+  $effect(() => {
+    uiInst?.updateYRange($store.rangeDb[0], $store.rangeDb[1]);
+  });
 
   const useLineSpectrogram = (canvas: HTMLCanvasElement) => {
     const offscreenCanvas = canvas.transferControlToOffscreen();
@@ -105,9 +122,9 @@
     height={height * dpr}
     style="width: {width}px; height: {height}px;"
     use:useLineSpectrogram
-    on:mousemove={handleMouseMove}
-    on:mouseleave={handleMouseLeave}
-  />
+    onmousemove={handleMouseMove}
+    onmouseleave={handleMouseLeave}
+></canvas>
 </div>
 
 <style lang="css">

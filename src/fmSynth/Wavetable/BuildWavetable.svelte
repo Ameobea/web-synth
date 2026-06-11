@@ -1,10 +1,14 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   interface BuildWavetableState {
     isPlaying: boolean;
     volumeDb: number;
     wavetablePosition: number;
     frequency: number;
     enableCodeEditor: boolean;
+  }
+
+  interface RenderedWavetableRef {
+    renderedWavetable: Float32Array<ArrayBufferLike>[];
   }
 
   const buildDefaultBuildWavetableState = (): BuildWavetableState => ({
@@ -45,45 +49,58 @@ return new Array(64).fill(null).map((_, i) => i === 0 ? 0 : (1 / i));
   import { logError } from 'src/sentry';
   import type { PromiseResolveType } from 'src/util';
 
-  export let onSubmit: (val: WavetablePreset) => void;
-  export let onCancel: () => void;
-  export let initialInstState: WavetablePreset | undefined = undefined;
-  export let hideSaveControls = false;
-  export let worker: Comlink.Remote<WavetableConfiguratorWorker>;
+  interface Props {
+    onSubmit: (val: WavetablePreset) => void;
+    onCancel: () => void;
+    initialInstState?: WavetablePreset | undefined;
+    hideSaveControls?: boolean;
+    worker: Comlink.Remote<WavetableConfiguratorWorker>;
+  }
 
-  let sliderMode: BuildWavetableSliderMode = BuildWavetableSliderMode.Magnitude;
-  let inst: BuildWavetableInstance | null = null;
-  let uiState: BuildWavetableState = {
+  let {
+    onSubmit,
+    onCancel,
+    initialInstState = undefined,
+    hideSaveControls = false,
+    worker
+  }: Props = $props();
+
+  let sliderMode: BuildWavetableSliderMode = $state(BuildWavetableSliderMode.Magnitude);
+  let inst: BuildWavetableInstance | null = $state(null);
+  let uiState: BuildWavetableState = $state({
     ...buildDefaultBuildWavetableState(),
-    enableCodeEditor: !!initialInstState?.sourceCode,
-  };
-  let presetState: WavetablePreset = {
-    waveforms: initialInstState?.waveforms ?? [
+  });
+  let presetState: WavetablePreset = $state({
+    waveforms: [
       { instState: buildDefaultBuildWavetableInstanceState(), renderedWaveformSamplesBase64: '' },
     ],
-    sourceCode: initialInstState?.sourceCode ?? DEFAULT_WAVETABLE_SOURCE_CODE,
-  };
-  let isExecutingCode = false;
-  const renderedWavetableRef = {
+    sourceCode: DEFAULT_WAVETABLE_SOURCE_CODE,
+  });
+  let isExecutingCode = $state(false);
+  const renderedWavetableRef: RenderedWavetableRef = $state({
     renderedWavetable: [
       new Float32Array(BUILD_WAVETABLE_INST_WAVEFORM_LENGTH_SAMPLES * presetState.waveforms.length),
     ],
-  };
-  let activeWaveformIx = 0;
+  });
+  let activeWaveformIx = $state(0);
 
   let lastInitialInstState: WavetablePreset | undefined = undefined;
-  $: if (initialInstState && initialInstState !== lastInitialInstState) {
-    lastInitialInstState = initialInstState;
-    presetState.waveforms = initialInstState.waveforms;
-    inst?.setState(presetState.waveforms[activeWaveformIx].instState);
+  $effect(() => {
+    if (initialInstState && initialInstState !== lastInitialInstState) {
+      lastInitialInstState = initialInstState;
+      presetState.waveforms = initialInstState.waveforms;
+      presetState.sourceCode = initialInstState.sourceCode ?? DEFAULT_WAVETABLE_SOURCE_CODE;
+      uiState.enableCodeEditor = !!initialInstState.sourceCode;
+      inst?.setState(presetState.waveforms[activeWaveformIx].instState);
 
-    worker
-      .renderWavetable(presetState.waveforms.map(w => w.instState))
-      .then(newRenderedWaveformSamples => {
-        renderedWavetableRef.renderedWavetable = newRenderedWaveformSamples;
-      })
-      .catch(err => void logError('Error rendering initial wavetable', err));
-  }
+      worker
+        .renderWavetable(presetState.waveforms.map(w => w.instState))
+        .then(newRenderedWaveformSamples => {
+          renderedWavetableRef.renderedWavetable = newRenderedWaveformSamples;
+        })
+        .catch(err => void logError('Error rendering initial wavetable', err));
+    }
+  });
 
   const setActiveWaveformIx = (newIx: number, skipSerialize?: boolean) => {
     if (!skipSerialize) {
@@ -259,7 +276,7 @@ return new Array(64).fill(null).map((_, i) => i === 0 ? 0 : (1 / i));
         height={BUILD_WAVETABLE_INST_HEIGHT_PX}
         style="max-width: {BUILD_WAVETABLE_INST_WIDTH_PX}px; max-height: {BUILD_WAVETABLE_INST_HEIGHT_PX}px;"
         use:buildWavetableInstance
-      />
+></canvas>
       <div class="controls-container">
         <SvelteControlPanel
           style={{ width: 440 }}

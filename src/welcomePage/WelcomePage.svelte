@@ -14,11 +14,11 @@
   </p>
 
   <div class="links">
-    <!-- svelte-ignore security-anchor-rel-noreferrer -->
+    <!-- svelte-ignore security_anchor_rel_noreferrer -->
     <a target="_blank" href="https://github.com/ameobea/web-synth">GitHub</a>
-    <!-- svelte-ignore security-anchor-rel-noreferrer -->
+    <!-- svelte-ignore security_anchor_rel_noreferrer -->
     <a target="_blank" href="https://www.youtube.com/watch?v=42ytPljgJ_U">Demo Video</a>
-    <!-- svelte-ignore security-anchor-rel-noreferrer -->
+    <!-- svelte-ignore security_anchor_rel_noreferrer -->
     <a target="_blank" href="https://synth.ameo.dev/docs/">Docs</a>
   </div>
 
@@ -76,7 +76,7 @@
           <ul>
             <li>
               Supports many primitive waveforms as well as loading
-              <!-- svelte-ignore security-anchor-rel-noreferrer -->
+              <!-- svelte-ignore security_anchor_rel_noreferrer -->
               wavetables from <a target="_blank" href="https://synthtech.com/waveedit/">WaveEdit</a>
               or other sources
             </li>
@@ -106,10 +106,10 @@
       <li>
         <details>
           <summary>
-            <!-- svelte-ignore security-anchor-rel-noreferrer -->
+            <!-- svelte-ignore security_anchor_rel_noreferrer -->
             Dynamic compilation of DSP code written in
             <a target="_blank" href="https://faust.grame.fr/">Faust</a>
-            <!-- svelte-ignore security-anchor-rel-noreferrer -->
+            <!-- svelte-ignore security_anchor_rel_noreferrer -->
             and <a target="_blank" href="https://soul.dev">Soul</a> via WebAssembly</summary
           >
           <ul>

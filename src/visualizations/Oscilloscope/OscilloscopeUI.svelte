@@ -5,21 +5,27 @@
   import OscilloscopeControls from 'src/visualizations/Oscilloscope/OscilloscopeControls.svelte';
   import type { OscilloscopeUIState } from 'src/visualizations/Oscilloscope/types';
 
-  export let inst: Oscilloscope;
-  export let uiState: Writable<OscilloscopeUIState>;
+  interface Props {
+    inst: Oscilloscope;
+    uiState: Writable<OscilloscopeUIState>;
+  }
+
+  let { inst, uiState }: Props = $props();
 
   const dpr = Math.floor(window.devicePixelRatio || 1);
-  let windowWidth = 100;
-  $: width = (() => {
+  let windowWidth = $state(100);
+  let width = $derived((() => {
     const remainder = windowWidth % dpr;
     return windowWidth - remainder;
-  })();
-  $: height = (() => {
+  })());
+  let height = $derived((() => {
     const baseHeight = 340;
     const remainder = baseHeight % dpr;
     return baseHeight - remainder;
-  })();
-  $: inst.resizeView(width, height);
+  })());
+  $effect(() => {
+    inst.resizeView(width, height);
+  });
 
   const useOscilloscopeViz = (canvas: HTMLCanvasElement) => {
     const offscreenCanvas = canvas.transferControlToOffscreen();
@@ -37,7 +43,7 @@
     height={height * dpr}
     style="width: {width}px; height: {height}px;"
     use:useOscilloscopeViz
-  />
+></canvas>
   <OscilloscopeControls {inst} state={uiState} />
 </div>
 

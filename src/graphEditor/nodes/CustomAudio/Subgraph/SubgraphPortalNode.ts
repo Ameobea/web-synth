@@ -17,7 +17,7 @@ import { get, writable, type Writable } from 'svelte/store';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
 import { PlaceholderInput } from 'src/controlPanel/PlaceholderInput';
 import SubgraphPortalSmallView from 'src/graphEditor/nodes/CustomAudio/Subgraph/SubgraphPortalSmallView.svelte';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 
 interface SubgraphPortalNodeState {
   txSubgraphID: string;

@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const settings: ControlPanelSetting[] = [
     { label: 'carrier gain (dB)', type: 'range', min: -40, max: 50 },
     { label: 'modulator gain (dB)', type: 'range', min: -40, max: 50 },
@@ -14,12 +14,16 @@
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { VocoderState } from 'src/graphEditor/nodes/CustomAudio/Vocoder/VocoderNode';
 
-  export let store: Writable<VocoderState>;
-  $: state = {
+  interface Props {
+    store: Writable<VocoderState>;
+  }
+
+  let { store }: Props = $props();
+  let state = $derived({
     'carrier gain (dB)': $store.carrierGainDb,
     'modulator gain (dB)': $store.modulatorGainDb,
     'post gain (dB)': $store.postGainDb,
-  };
+  });
 
   const handleChange = (key: string, value: number, _newState: Record<string, any>) => {
     store.update(state => {

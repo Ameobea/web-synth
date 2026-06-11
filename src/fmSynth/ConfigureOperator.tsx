@@ -11,7 +11,7 @@ import type { GateUngateCallbackRegistrar } from 'src/fmSynth/midiSampleUI/types
 import type { UploadWavetableModalProps } from 'src/fmSynth/Wavetable/UploadWavetable';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import type { SampleMappingState } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
-import { mkSvelteComponentShim } from 'src/svelteUtils';
+import { mkSvelteComponentShim } from 'src/svelteUtils.svelte';
 import ConfigureSampleMappingInner from './midiSampleUI/ConfigureSampleMapping.svelte';
 
 export {

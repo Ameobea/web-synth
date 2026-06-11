@@ -3,18 +3,35 @@
   import type { ADSRWithOutputRange } from 'src/controls/adsr2/ControlPanelADSR2';
   import ReactShim from 'src/misc/ReactShim.svelte';
 
-  export let width: number | undefined;
-  export let height: number | undefined;
-  export let initialState: ADSRWithOutputRange;
-  export let onChange: (newState: ADSRWithOutputRange) => void;
-  export let vcId: string | undefined;
-  export let debugName: string | undefined;
-  export let disableControlPanel: boolean | undefined;
-  export let instanceCb: ((instance: ADSR2Instance) => void) | undefined;
-  export let enableInfiniteMode: boolean | undefined = false;
-  export let disablePhaseVisualization: boolean | undefined = false;
-  export let setFrozenOutputValue: ((frozenOutputValue: number) => void) | undefined;
-  export let beatsPerMeasure: number | undefined = undefined;
+  interface Props {
+    width: number | undefined;
+    height: number | undefined;
+    initialState: ADSRWithOutputRange;
+    onChange: (newState: ADSRWithOutputRange) => void;
+    vcId: string | undefined;
+    debugName: string | undefined;
+    disableControlPanel: boolean | undefined;
+    instanceCb: ((instance: ADSR2Instance) => void) | undefined;
+    enableInfiniteMode?: boolean | undefined;
+    disablePhaseVisualization?: boolean | undefined;
+    setFrozenOutputValue: ((frozenOutputValue: number) => void) | undefined;
+    beatsPerMeasure?: number | undefined;
+  }
+
+  let {
+    width,
+    height,
+    initialState,
+    onChange,
+    vcId,
+    debugName,
+    disableControlPanel,
+    instanceCb,
+    enableInfiniteMode = false,
+    disablePhaseVisualization = false,
+    setFrozenOutputValue,
+    beatsPerMeasure = undefined
+  }: Props = $props();
 
   const ADSR2Promise = import('src/controls/adsr2/adsr2').then(m => m.default);
 </script>

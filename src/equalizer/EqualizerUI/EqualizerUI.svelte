@@ -7,25 +7,33 @@
   import EqualizerBackground from 'src/equalizer/EqualizerUI/EqualizerBackground.svelte';
   import ConfigureBand from 'src/equalizer/EqualizerUI/ConfigureBand.svelte';
 
-  export let inst: EqualizerInstance;
-  $: stateStore = inst.state;
-  $: state = $stateStore;
-  $: automatedParamsStore = inst.automatedParams;
-  $: automatedParams = $automatedParamsStore;
-  $: automationValsSABStore = inst.automationValsSAB;
-  $: automationValsSAB = $automationValsSABStore;
-  $: uiStateStore = inst.uiState;
-  $: eqUIHidden = $uiStateStore.hidden;
+  interface Props {
+    inst: EqualizerInstance;
+  }
 
-  let container: HTMLDivElement;
-  let containerWidth: number = 100;
-  let containerHeight: number = 100;
+  let { inst }: Props = $props();
+  let stateStore = $derived(inst.state);
+  let eqState = $derived($stateStore);
+  let automatedParamsStore = $derived(inst.automatedParams);
+  let automatedParams = $derived($automatedParamsStore);
+  let automationValsSABStore = $derived(inst.automationValsSAB);
+  let automationValsSAB = $derived($automationValsSABStore);
+  let uiStateStore = $derived(inst.uiState);
+  let eqUIHidden = $derived($uiStateStore.hidden);
 
-  $: stageWidth = containerWidth - EQ_AXIS_MARGIN.left - EQ_AXIS_MARGIN.right;
-  $: stageHeight = containerHeight - EQ_AXIS_MARGIN.top - EQ_AXIS_MARGIN.bottom;
+  let container: HTMLDivElement | null = $state(null);
+  let containerWidth: number = $state(100);
+  let containerHeight: number = $state(100);
+
+  let stageWidth = $derived(containerWidth - EQ_AXIS_MARGIN.left - EQ_AXIS_MARGIN.right);
+  let stageHeight = $derived(containerHeight - EQ_AXIS_MARGIN.top - EQ_AXIS_MARGIN.bottom);
 
   let resizeObs: ResizeObserver;
   onMount(() => {
+    if (!container) {
+      return;
+    }
+
     resizeObs = new ResizeObserver(entries => {
       // reported width goes to 0 when the element is not visible.  This causes issues when propagating
       // to the line spectrogram, so we ignore those cases.  All the vizs should get paused when the
@@ -41,11 +49,11 @@
     resizeObs.observe(container);
   });
 
-  onDestroy(() => resizeObs.disconnect());
+  onDestroy(() => resizeObs?.disconnect());
 
-  $: automatedParamsByBand = (() => {
+  let automatedParamsByBand = $derived((() => {
     const automatedParamsByBand: { freq: number | null; gain: number | null; q: number | null }[] =
-      state.bands.map(() => ({
+      eqState.bands.map(() => ({
         freq: null,
         gain: null,
         q: null,
@@ -65,18 +73,18 @@
     }
 
     return automatedParamsByBand;
-  })();
+  })());
 </script>
 
 <div class="root">
   <div class="viz" bind:this={container}>
     <EqualizerBackground {inst} {containerWidth} {containerHeight} {stageWidth} {stageHeight} />
     <div class="handles" style={`top: ${EQ_AXIS_MARGIN.top}px; left: ${EQ_AXIS_MARGIN.left}px;`}>
-      {#each state.bands as band, bandIx}
+      {#each eqState.bands as band, bandIx}
         <EqHandle
           {band}
           {bandIx}
-          isActive={state.activeBandIx === bandIx}
+          isActive={eqState.activeBandIx === bandIx}
           setActive={() => {
             if (inst.state.current.activeBandIx === bandIx) {
               return;
@@ -90,31 +98,31 @@
           automatedParams={automatedParamsByBand[bandIx]}
           {automationValsSAB}
           {eqUIHidden}
-          animateAutomatedParams={state.animateAutomatedParams ?? false}
+          animateAutomatedParams={eqState.animateAutomatedParams ?? false}
         />
       {/each}
     </div>
   </div>
   <div class="configure-band-wrapper">
-    {#if typeof state.activeBandIx === 'number'}
+    {#if typeof eqState.activeBandIx === 'number'}
       <ConfigureBand
-        band={state.bands[state.activeBandIx]}
-        bandIx={state.activeBandIx}
+        band={eqState.bands[eqState.activeBandIx]}
+        bandIx={eqState.activeBandIx}
         onChange={newBand => {
-          if (typeof state.activeBandIx === 'number') {
-            inst.setBand(state.activeBandIx, newBand);
+          if (typeof eqState.activeBandIx === 'number') {
+            inst.setBand(eqState.activeBandIx, newBand);
           }
         }}
         onDelete={() => {
-          if (typeof state.activeBandIx === 'number') {
-            inst.deleteBand(state.activeBandIx);
+          if (typeof eqState.activeBandIx === 'number') {
+            inst.deleteBand(eqState.activeBandIx);
           }
         }}
-        automatedParams={automatedParamsByBand[state.activeBandIx]}
-        isBypassed={state.isBypassed ?? false}
+        automatedParams={automatedParamsByBand[eqState.activeBandIx]}
+        isBypassed={eqState.isBypassed ?? false}
         setIsBypassed={isBypassed => inst.setBypassed(isBypassed)}
         reset={() => inst.reset()}
-        animateAutomatedParams={state.animateAutomatedParams ?? false}
+        animateAutomatedParams={eqState.animateAutomatedParams ?? false}
         setAnimateAutomatedParams={animateAutomatedParams =>
           inst.state.update(state => ({ ...state, animateAutomatedParams }))}
       />

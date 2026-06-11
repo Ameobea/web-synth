@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import type {
     ControlPanelSetting,
     ControlPanelTheme,
@@ -22,15 +22,27 @@
 
   const ControlPanelPromise = import('react-control-panel').then(m => m.default);
 
-  export let settings: ControlPanelSetting[];
-  export let state: Record<string, any> | undefined = undefined;
-  export let onChange:
-    | ((key: string, value: any, newState: Record<string, any>) => void)
-    | undefined = undefined;
-  export let style: CSSProperties | undefined = undefined;
-  export let theme: Partial<ControlPanelTheme> | undefined = undefined;
-  export let width: number | undefined = undefined;
-  export let title: string | undefined = undefined;
+  interface Props {
+    settings: ControlPanelSetting[];
+    state?: Record<string, any> | undefined;
+    onChange?:
+      | ((key: string, value: any, newState: Record<string, any>) => void)
+      | undefined;
+    style?: CSSProperties | undefined;
+    theme?: Partial<ControlPanelTheme> | undefined;
+    width?: number | undefined;
+    title?: string | undefined;
+  }
+
+  let {
+    settings,
+    state = undefined,
+    onChange = undefined,
+    style = undefined,
+    theme = undefined,
+    width = undefined,
+    title = undefined
+  }: Props = $props();
 </script>
 
 {#await ControlPanelPromise then ControlPanel}

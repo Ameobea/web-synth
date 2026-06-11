@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import { RegateMode } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/RegateMode';
   export { RegateMode };
 
@@ -22,8 +22,12 @@
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import { type MIDIToFrequencyState } from 'src/graphEditor/nodes/CustomAudio/MIDIToFrequency/MIDIToFrequency';
 
-  export let state: Writable<MIDIToFrequencyState>;
-  $: localState = { 'gate mode': $state.regateMode };
+  interface Props {
+    state: Writable<MIDIToFrequencyState>;
+  }
+
+  let { state }: Props = $props();
+  let localState = $derived({ 'gate mode': $state.regateMode });
 
   const handleChange = (_key: string, _val: any, newState: Record<string, any>) => {
     state.set({ regateMode: newState['gate mode'] });

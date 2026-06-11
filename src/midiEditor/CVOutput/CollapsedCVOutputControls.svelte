@@ -2,18 +2,28 @@
   import EditableInstanceName from 'src/midiEditor/EditableInstanceName.svelte';
   import SvelteDragHandle from 'src/midiEditor/SvelteDragHandle.svelte';
 
-  export let name: string;
-  export let expand: () => void;
-  export let deleteOutput: () => void;
-  export let setName: (name: string) => void;
-  export let activateDrag: () => void;
+  interface Props {
+    name: string;
+    expand: () => void;
+    deleteOutput: () => void;
+    setName: (name: string) => void;
+    activateDrag: () => void;
+  }
+
+  let {
+    name,
+    expand,
+    deleteOutput,
+    setName,
+    activateDrag
+  }: Props = $props();
 </script>
 
 <div
   class="collapsed-cv-output-controls"
-  on:click={expand}
+  onclick={expand}
   tabindex="0"
-  on:keydown={e => e.key === 'Enter' && expand()}
+  onkeydown={e => e.key === 'Enter' && expand()}
   aria-label="Expand"
   role="button"
 >
@@ -22,5 +32,5 @@
     style={{ zIndex: 2, top: 0, left: 28, position: 'absolute' }}
   />
   <EditableInstanceName left={60} {name} {setName} />
-  <button class="delete-cv-output-button" on:click={deleteOutput}>✕</button>
+  <button class="delete-cv-output-button" onclick={deleteOutput}>✕</button>
 </div>

@@ -4,10 +4,14 @@
   import MainSamplerUI from 'src/sampler/SamplerUI/MainSamplerUI.svelte';
   import PickSample from 'src/sampler/SamplerUI/PickSample.svelte';
 
-  export let inst: SamplerInstance;
+  interface Props {
+    inst: SamplerInstance;
+  }
 
-  $: activeSampleStore = inst.activeSample;
-  $: activeSample = $activeSampleStore;
+  let { inst }: Props = $props();
+
+  let activeSampleStore = $derived(inst.activeSample);
+  let activeSample = $derived($activeSampleStore);
 
   const onSamplePicked = (desc: SampleDescriptor | null) => inst.setSelectedSample(desc);
   const clearActiveSample = () => inst.setSelectedSample(null);

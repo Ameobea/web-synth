@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   interface State {
     attack: number;
     knee: number;
@@ -22,30 +22,34 @@
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
 
-  export let node: ForeignNode<DynamicsCompressorNode>;
+  interface Props {
+    node: ForeignNode<DynamicsCompressorNode>;
+  }
 
-  let state: State = node.serialize() as State;
+  let { node = $bindable() }: Props = $props();
+
+  let cpState: State = $state(node.serialize() as State);
 
   const handleChange = (key: string, val: number) => {
     switch (key) {
       case 'threshold (db)':
-        state.threshold = val;
+        cpState.threshold = val;
         node.paramOverrides.threshold.override.offset.value = val;
         break;
       case 'knee (db)':
-        state.knee = val;
+        cpState.knee = val;
         node.paramOverrides.knee.override.offset.value = val;
         break;
       case 'ratio':
-        state.ratio = val;
+        cpState.ratio = val;
         node.paramOverrides.ratio.override.offset.value = val;
         break;
       case 'attack (ms)':
-        state.attack = val / 1000;
+        cpState.attack = val / 1000;
         node.paramOverrides.attack.override.offset.value = val / 1000;
         break;
       case 'release (ms)':
-        state.release = val / 1000;
+        cpState.release = val / 1000;
         node.paramOverrides.release.override.offset.value = val / 1000;
         break;
       default:
@@ -57,11 +61,11 @@
 <SvelteControlPanel
   {settings}
   state={{
-    'threshold (db)': state.threshold,
-    'knee (db)': state.knee,
-    ratio: state.ratio,
-    'attack (ms)': state.attack * 1000,
-    'release (ms)': state.release * 1000,
+    'threshold (db)': cpState.threshold,
+    'knee (db)': cpState.knee,
+    ratio: cpState.ratio,
+    'attack (ms)': cpState.attack * 1000,
+    'release (ms)': cpState.release * 1000,
   }}
   onChange={handleChange}
   style={{ width: 500 }}

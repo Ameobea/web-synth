@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const settings: ControlPanelSetting[] = [
     { label: 'input', type: 'text' },
     { label: 'times', type: 'text' },
@@ -13,11 +13,15 @@
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { MultiplyNodeState } from 'src/graphEditor/nodes/CustomAudio/MultiplyNode/MultiplyNode';
 
-  export let store: Writable<MultiplyNodeState>;
-  let localState = {
+  interface Props {
+    store: Writable<MultiplyNodeState>;
+  }
+
+  let { store }: Props = $props();
+  let localState = $state({
     input: `${$store.input}`,
     times: `${$store.times}`,
-  };
+  });
 
   const handleChange = (
     key: keyof MultiplyNodeState,

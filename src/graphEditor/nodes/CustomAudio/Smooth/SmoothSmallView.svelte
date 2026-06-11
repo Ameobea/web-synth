@@ -3,10 +3,13 @@
   import type { SmoothNode } from './SmoothNode';
   import SvelteControlPanel from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
 
-  export let node: SmoothNode;
+  interface Props {
+    node: SmoothNode;
+  }
 
-  let settings: ControlPanelSetting[] = [];
-  $: settings = [
+  let { node }: Props = $props();
+
+  const settings: ControlPanelSetting[] = [
     { label: 'filter coefficient', type: 'range', min: 0.9, max: 0.9999, scale: 'log' },
   ];
 
@@ -19,14 +22,14 @@
         console.error(`Unhandled key in \`SmoothSmallView\`: ${key}`);
     }
   };
-  $: stateStore = node.state;
-  $: nodeState = $stateStore;
+  let stateStore = $derived(node.state);
+  let nodeState = $derived($stateStore);
 
-  $: state = { 'filter coefficient': nodeState.filterCoefficient };
+  let cpState = $derived({ 'filter coefficient': nodeState.filterCoefficient });
 </script>
 
 <div class="root">
-  <SvelteControlPanel {settings} {state} onChange={handleChange} width={500} />
+  <SvelteControlPanel {settings} state={cpState} onChange={handleChange} width={500} />
   <p>Applies a one-pole lowpass filter to the input signal.</p>
   <p>
     This is very useful for things like effect parameters to avoid clicksand other audio artifacts

@@ -10,11 +10,14 @@
     OscilloscopeWindowType,
   } from 'src/visualizations/Oscilloscope/types';
 
-  export let inst: Oscilloscope;
-  export let state: Writable<OscilloscopeUIState>;
+  interface Props {
+    inst: Oscilloscope;
+    state: Writable<OscilloscopeUIState>;
+  }
 
-  let settings: ControlPanelSetting[] = [];
-  $: {
+  let { inst, state: stateStore }: Props = $props();
+
+  let settings: ControlPanelSetting[] = $derived.by(() => {
     const {
       min: minWindowLength,
       max: maxWindowLength,
@@ -47,7 +50,7 @@
         OscilloscopeWindowType,
         { min: number; max: number; scale: 'log' | undefined; step: number | undefined }
       >
-    )[$state.window.type];
+    )[$stateStore.window.type];
 
     const newSettings: ControlPanelSetting[] = [
       {
@@ -66,14 +69,14 @@
       { label: 'freeze', type: 'checkbox' },
       { label: 'frame by frame', type: 'checkbox' },
     ];
-    if ($state.window.type === OscilloscopeWindowType.Wavelengths) {
+    if ($stateStore.window.type === OscilloscopeWindowType.Wavelengths) {
       newSettings.push({ label: 'snap to midi', type: 'checkbox' });
     }
 
-    settings = newSettings;
-  }
+    return newSettings;
+  });
 
-  $: controlPanelState = {
+  let controlPanelState = $derived({
     'window mode': (() => {
       const mode = (
         {
@@ -82,17 +85,17 @@
           [OscilloscopeWindowType.Samples]: 'samples',
           [OscilloscopeWindowType.Wavelengths]: 'wavelengths',
         } as Record<OscilloscopeWindowType, string>
-      )[$state.window.type];
+      )[$stateStore.window.type];
       if (mode === undefined) {
-        throw new Error(`Invalid window type: ${$state.window.type}`);
+        throw new Error(`Invalid window type: ${$stateStore.window.type}`);
       }
       return mode;
     })(),
-    'window length': $state.window.value,
-    freeze: $state.frozen,
-    'frame by frame': $state.frameByFrame,
-    'snap to midi': $state.snapF0ToMIDI,
-  };
+    'window length': $stateStore.window.value,
+    freeze: $stateStore.frozen,
+    'frame by frame': $stateStore.frameByFrame,
+    'snap to midi': $stateStore.snapF0ToMIDI,
+  });
 
   const handleChange = (key: string, value: any, _state: Record<string, any>) => {
     switch (key) {
@@ -109,7 +112,7 @@
           throw new Error(`Invalid window type: ${value}`);
         }
 
-        state.update(state => {
+        stateStore.update(state => {
           if (state.window.type === newWindowType) {
             return state;
           }
@@ -131,7 +134,7 @@
         });
         break;
       case 'window length':
-        state.update(state => {
+        stateStore.update(state => {
           if (state.window.value === value) {
             return state;
           }
@@ -152,7 +155,7 @@
         break;
       case 'freeze':
         inst.setFrozen(value);
-        state.update(state => {
+        stateStore.update(state => {
           if (state.frozen === value) {
             return state;
           }
@@ -165,7 +168,7 @@
         break;
       case 'frame by frame':
         inst.setFrameByFrame(value);
-        state.update(state => {
+        stateStore.update(state => {
           if (state.frameByFrame === value) {
             return state;
           }
@@ -178,7 +181,7 @@
         break;
       case 'snap to midi':
         inst.setSnapF0ToMIDI(value);
-        state.update(state => {
+        stateStore.update(state => {
           if (state.snapF0ToMIDI === value) {
             return state;
           }

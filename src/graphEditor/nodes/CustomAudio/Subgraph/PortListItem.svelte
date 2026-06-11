@@ -3,19 +3,28 @@
   import type { MIDINode } from 'src/patchNetwork/midiNode';
   import { formatConnectableType, type ConnectableType } from 'src/patchNetwork/patchNetwork';
 
-  export let port: {
+  interface Props {
+    port: {
     type: ConnectableType;
     node: AudioNode | MIDINode;
   };
-  export let name: string;
-  export let onDelete: () => void;
-  export let onRename: (newName: string) => void;
+    name: string;
+    onDelete: () => void;
+    onRename: (newName: string) => void;
+  }
+
+  let {
+    port,
+    name,
+    onDelete,
+    onRename
+  }: Props = $props();
 </script>
 
 <div class="root">
   <div class="delete-button">
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <div role="button" on:click={onDelete} tabindex="0">×</div>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div role="button" onclick={onDelete} tabindex="0">×</div>
   </div>
   <div class="port-name">
     <EditableInstanceName left={0} {name} setName={onRename} --position="relative" />

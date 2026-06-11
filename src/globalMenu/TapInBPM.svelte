@@ -1,15 +1,19 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
 
-  export let onSubmit: (bpm: number) => void;
+  interface Props {
+    onSubmit: (bpm: number) => void;
+  }
 
-  let isOpen = false;
-  let lastTapTime: number | null = null;
-  let intervalsMs: number[] = [];
-  $: bpm =
-    intervalsMs.length > 0
+  let { onSubmit }: Props = $props();
+
+  let isOpen = $state(false);
+  let lastTapTime: number | null = $state(null);
+  let intervalsMs: number[] = $state([]);
+  let bpm =
+    $derived(intervalsMs.length > 0
       ? 60000 / (intervalsMs.reduce((acc, curr) => acc + curr) / intervalsMs.length)
-      : null;
+      : null);
 
   const handleTap = () => {
     const now = Date.now();
@@ -42,13 +46,13 @@
 <div class="root">
   {#if isOpen}
     <p>Click the button below to the beat or press the <code>\</code> key.</p>
-    <button on:click={handleTap}>Tap</button>
+    <button onclick={handleTap}>Tap</button>
     {#if lastTapTime !== null}
       <p>BPM: {bpm === null ? '-' : bpm.toFixed(2)}</p>
-      <button on:click={reset}>Reset</button>
+      <button onclick={reset}>Reset</button>
       {#if bpm !== null}
         <button
-          on:click={() => {
+          onclick={() => {
             isOpen = false;
             onSubmit(bpm);
           }}
@@ -59,7 +63,7 @@
     {/if}
   {:else}
     <button
-      on:click={() => {
+      onclick={() => {
         isOpen = true;
       }}
     >

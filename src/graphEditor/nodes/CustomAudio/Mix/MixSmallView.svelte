@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const SETTINGS: ControlPanelSetting[] = [
     { label: 'input/output type', type: 'select', options: ['audio', 'cv'] },
     { label: 'mix', type: 'range', min: 0, max: 1, step: 0.00001 },
@@ -11,9 +11,13 @@
   } from 'src/controls/SvelteControlPanel/SvelteControlPanel.svelte';
   import type { MixNode } from './Mix';
 
-  export let node: MixNode;
-  $: stateStore = node.state;
-  $: state = $stateStore;
+  interface Props {
+    node: MixNode;
+  }
+
+  let { node }: Props = $props();
+  let stateStore = $derived(node.state);
+  let state = $derived($stateStore);
 
   const handleChange = (key: string, val: any) => {
     switch (key) {

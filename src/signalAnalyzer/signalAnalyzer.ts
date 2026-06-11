@@ -6,7 +6,7 @@ import {
   type SerializedSignalAnalyzerInst,
   SignalAnalyzerInst,
 } from 'src/signalAnalyzer/SignalAnalyzerInst';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import { noop, tryParseJson } from 'src/util';
 
 interface SignalAnalyzerHandle {

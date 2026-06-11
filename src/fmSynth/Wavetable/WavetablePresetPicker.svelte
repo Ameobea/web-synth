@@ -12,9 +12,8 @@
   import WavetablePresetInfo from 'src/fmSynth/Wavetable/WavetablePresetInfo.svelte';
   import ReactShim from 'src/misc/ReactShim.svelte';
   import { addProps } from 'src/reactUtils';
-  import { mkSvelteComponentShim } from 'src/svelteUtils';
+  import { mkSvelteComponentShim } from 'src/svelteUtils.svelte';
 
-  export let worker: Comlink.Remote<WavetableConfiguratorWorker>;
 
   interface WavetablePresetInfoReactProps extends CustomPresetInfoProps<WavetablePresetDescriptor> {
     worker: Comlink.Remote<WavetableConfiguratorWorker>;
@@ -22,24 +21,31 @@
   const WavetablePresetInfoReact: React.FC<WavetablePresetInfoReactProps> =
     mkSvelteComponentShim<WavetablePresetInfoReactProps>(WavetablePresetInfo) as any;
 
-  const WavetablePresetPickerReact = mkGenericPresetPicker(
-    () =>
-      fetchWavetablePresets().then(presets =>
-        presets.map(preset => ({
-          id: preset.id,
-          name: preset.name,
-          description: preset.description,
-          tags: preset.tags,
-          preset,
-          isFeatured: preset.isFeatured,
-        }))
-      ),
-    { width: '100%', height: 'calc(100% - 20px)', boxSizing: 'border-box' },
-    addProps(WavetablePresetInfoReact, { worker })
-  );
+  interface Props {
+    worker: Comlink.Remote<WavetableConfiguratorWorker>;
+    onSubmit: (pickedPreset: PresetDescriptor<WavetablePresetDescriptor>) => void;
+    onCancel: () => void;
+  }
 
-  export let onSubmit: (pickedPreset: PresetDescriptor<WavetablePresetDescriptor>) => void;
-  export let onCancel: () => void;
+  let { worker, onSubmit, onCancel }: Props = $props();
+
+  let WavetablePresetPickerReact = $derived(
+    mkGenericPresetPicker(
+      () =>
+        fetchWavetablePresets().then(presets =>
+          presets.map(preset => ({
+            id: preset.id,
+            name: preset.name,
+            description: preset.description,
+            tags: preset.tags,
+            preset,
+            isFeatured: preset.isFeatured,
+          }))
+        ),
+      { width: '100%', height: 'calc(100% - 20px)', boxSizing: 'border-box' },
+      addProps(WavetablePresetInfoReact, { worker })
+    )
+  );
 </script>
 
 <ReactShim

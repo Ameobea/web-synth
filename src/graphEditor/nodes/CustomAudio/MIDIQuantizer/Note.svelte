@@ -1,19 +1,29 @@
 <script lang="ts">
-  export let selected: boolean;
-  export let noteType: 'white' | 'black';
-  export let onClick: () => void;
+  interface Props {
+    selected: boolean;
+    noteType: 'white' | 'black';
+    onClick: () => void;
+    children?: import('svelte').Snippet;
+  }
+
+  let {
+    selected,
+    noteType,
+    onClick,
+    children
+  }: Props = $props();
 </script>
 
 <div
   class="note"
   data-selected={selected}
   data-note-type={noteType}
-  on:click={onClick}
-  on:keyup={() => {}}
+  onclick={onClick}
+  onkeyup={() => {}}
   tabindex="0"
   role="button"
 >
-  <slot />
+  {@render children?.()}
 </div>
 
 <style lang="css">

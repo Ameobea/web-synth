@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import {
     MAX_MIXER_TRACK_COUNT,
     type MixerNode,
@@ -67,7 +67,7 @@
 
 <script lang="ts">
   import React from 'react';
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
 
   import SvelteControlPanel, {
     type ControlPanelSetting,
@@ -78,16 +78,24 @@
   import { AsyncOnce, UnreachableError } from 'src/util';
 
   const ctx = new AudioContext();
-  export let mixer: MixerNode;
-  let inputCount = mixer.gainParams.length;
-
-  let awpHandle: AudioWorkletNode | null = null;
-  let audioThreadBuffer: Float32Array | null = null;
-  let vizInst: MixerLevelsViz | null = null;
-  $: if (audioThreadBuffer) {
-    vizInst?.setAudioThreadBuffer(audioThreadBuffer);
+  interface Props {
+    mixer: MixerNode;
   }
-  $: awpHandle?.port.postMessage({ type: 'setActiveTrackCount', activeTrackCount: inputCount });
+
+  let { mixer }: Props = $props();
+  let inputCount = $state(untrack(() => mixer.gainParams.length));
+
+  let awpHandle: AudioWorkletNode | null = $state(null);
+  let audioThreadBuffer: Float32Array | null = $state(null);
+  let vizInst: MixerLevelsViz | null = $state(null);
+  $effect(() => {
+    if (audioThreadBuffer) {
+      vizInst?.setAudioThreadBuffer(audioThreadBuffer);
+    }
+  });
+  $effect(() => {
+    awpHandle?.port.postMessage({ type: 'setActiveTrackCount', activeTrackCount: inputCount });
+  });
 
   const connectTrackToAWP = (awpHandle: AudioWorkletNode, trackIx: number, disconnect: boolean) => {
     const gainInput = mixer.gainParams[trackIx];
@@ -172,7 +180,7 @@
     vizInst?.removeInput();
   };
 
-  $: settings = buildSettings(mixer, inputCount, addInput, removeInput);
+  let settings = $derived(buildSettings(mixer, inputCount, addInput, removeInput));
 
   const buildMixerLevelsViz = (
     canvas: HTMLCanvasElement,
@@ -202,7 +210,7 @@
 
 <div style="position: relative;">
   {#await import('src/graphEditor/nodes/CustomAudio/mixer/MixerLevelsViz').then(viz => viz.MixerLevelsViz) then MixerLevelsViz}
-    <canvas use:buildMixerLevelsViz={MixerLevelsViz} />
+    <canvas use:buildMixerLevelsViz={MixerLevelsViz}></canvas>
   {/await}
   <SvelteControlPanel
     {settings}

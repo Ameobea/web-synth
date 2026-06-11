@@ -8,22 +8,28 @@
   } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
   import MappedSamplesListing from './MappedSamplesListing.svelte';
 
-  export let registerGateUngateCallbacks: GateUngateCallbackRegistrar;
-  export let store: Writable<SampleMappingState>;
-  export let operatorIx: number;
-
-  $: if (!$store.stateByOperatorIx[operatorIx]) {
-    $store.stateByOperatorIx[operatorIx] = buildDefaultSampleMappingOperatorState();
+  interface Props {
+    registerGateUngateCallbacks: GateUngateCallbackRegistrar;
+    store: Writable<SampleMappingState>;
+    operatorIx: number;
   }
+
+  let { registerGateUngateCallbacks, store, operatorIx }: Props = $props();
+
+  $effect.pre(() => {
+    if (!$store.stateByOperatorIx[operatorIx]) {
+      $store.stateByOperatorIx[operatorIx] = buildDefaultSampleMappingOperatorState();
+    }
+  });
 </script>
 
 <div class="root">
   <div
     class="mapped-samples-listing-header"
-    on:click={() =>
+    onclick={() =>
       ($store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded =
         !$store.stateByOperatorIx[operatorIx].mappedSamplesListingExpanded)}
-    on:keyup={() => {}}
+    onkeyup={() => {}}
     tabindex="0"
     role="button"
   >

@@ -2,22 +2,34 @@
   import type { MIDIEditorBaseView } from 'src/midiEditor';
   import { CURSOR_COLOR } from 'src/midiEditor/conf';
   import { colorToHexString } from 'src/util';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
 
-  export let marginLeft: number;
-  export let marginTop: number;
-  export let width: number;
-  export let height: number;
-  export let view: MIDIEditorBaseView;
-  export let getCursorPosBeats: () => number;
-  export let setCursorPosBeats: (pos: number) => void;
+  interface Props {
+    marginLeft: number;
+    marginTop: number;
+    width: number;
+    height: number;
+    view: MIDIEditorBaseView;
+    getCursorPosBeats: () => number;
+    setCursorPosBeats: (pos: number) => void;
+  }
 
-  $: pxPerBeat = view.pxPerBeat;
-  $: scrollHorizontalBeats = view.scrollHorizontalBeats;
+  let {
+    marginLeft,
+    marginTop,
+    width,
+    height,
+    view,
+    getCursorPosBeats,
+    setCursorPosBeats
+  }: Props = $props();
 
-  let cursorPosBeats = getCursorPosBeats();
+  let pxPerBeat = $derived(view.pxPerBeat);
+  let scrollHorizontalBeats = $derived(view.scrollHorizontalBeats);
 
-  $: left = (cursorPosBeats - scrollHorizontalBeats) * pxPerBeat;
+  let cursorPosBeats = $state(untrack(() => getCursorPosBeats()));
+
+  let left = $derived((cursorPosBeats - scrollHorizontalBeats) * pxPerBeat);
 
   let pointerDown = false;
 
@@ -84,8 +96,8 @@
       cursor="pointer"
     />
     <!-- transparent background a little wider so the user can click/drag it -->
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <rect
       x="-5"
       y="0"
@@ -93,7 +105,7 @@
       height="100%"
       fill="transparent"
       cursor="pointer"
-      on:pointerdown={handleCursorClick}
+      onpointerdown={handleCursorClick}
     />
   </g>
 </svg>

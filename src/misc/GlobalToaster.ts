@@ -1,5 +1,5 @@
 import GlobalToaster from 'src/misc/GlobalToaster.svelte';
-import { mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import type { Renderable, ToastOptions } from 'svelte-french-toast';
 import { writable } from 'svelte/store';
 

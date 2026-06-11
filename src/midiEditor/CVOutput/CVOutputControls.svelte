@@ -7,16 +7,31 @@
   import CVOutputControlsInner from './CVOutputControlsInner.svelte';
   import type { MIDIEditorBaseView } from 'src/midiEditor';
 
-  export let name: string;
-  export let setName: (name: string) => void;
-  export let state: Writable<CVOutputState>;
-  export let deleteOutput: () => void;
-  export let registerInstance: (instance: ADSR2Instance) => void;
-  export let setFrozenOutputValue: (frozenOutputValue: number) => void;
-  export let view: Writable<MIDIEditorBaseView>;
-  export let getCursorPosBeats: () => number;
-  export let setCursorPosBeats: (newCursorPosBeats: number) => void;
-  export let activateDrag: () => void;
+  interface Props {
+    name: string;
+    setName: (name: string) => void;
+    state: Writable<CVOutputState>;
+    deleteOutput: () => void;
+    registerInstance: (instance: ADSR2Instance) => void;
+    setFrozenOutputValue: (frozenOutputValue: number) => void;
+    view: Writable<MIDIEditorBaseView>;
+    getCursorPosBeats: () => number;
+    setCursorPosBeats: (newCursorPosBeats: number) => void;
+    activateDrag: () => void;
+  }
+
+  let {
+    name,
+    setName,
+    state,
+    deleteOutput,
+    registerInstance,
+    setFrozenOutputValue,
+    view,
+    getCursorPosBeats,
+    setCursorPosBeats,
+    activateDrag
+  }: Props = $props();
 
   const expand = () => {
     $state.isExpanded = true;

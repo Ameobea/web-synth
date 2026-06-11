@@ -1,38 +1,52 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   const MIDI_NOTE_RANGE = new Array(100).fill(null).map((_, i) => i);
 </script>
 
 <script lang="ts">
-  import { onDestroy } from 'svelte';
-
   import ConfigureMIDIMapping from 'src/fmSynth/midiSampleUI/ConfigureMIDIMapping.svelte';
   import MappedNoteRow from 'src/fmSynth/midiSampleUI/MappedNoteRow.svelte';
   import {
     buildDefaultMappedSampleData,
+    type MappedSampleData,
     type SampleMappingOperatorState,
   } from 'src/graphEditor/nodes/CustomAudio/FMSynth/sampleMapping';
   import type { GateUngateCallbackRegistrar } from './types';
 
-  export let registerGateUngateCallbacks: GateUngateCallbackRegistrar;
-  export let state: SampleMappingOperatorState;
-  export let selectedMIDINumber: number | null;
+  interface Props {
+    registerGateUngateCallbacks: GateUngateCallbackRegistrar;
+    state: SampleMappingOperatorState;
+    selectedMIDINumber: number | null;
+  }
 
-  let isLearningMIDIMapping = false;
+  let {
+    registerGateUngateCallbacks,
+    state: mappingState = $bindable(),
+    selectedMIDINumber = $bindable(),
+  }: Props = $props();
 
-  let gatedNotes: { [midiNumber: number]: true | false } = {};
-  let unregisterGateCBs: (() => void) | undefined;
-  $: {
-    unregisterGateCBs?.();
+  let isLearningMIDIMapping = $state(false);
+  let gatedNotes: { [midiNumber: number]: boolean } = $state({});
 
+  const setMappedSamples = (midiNumber: number, mappedSamples: MappedSampleData[]) => {
+    mappingState = {
+      ...mappingState,
+      mappedSamplesByMIDINumber: {
+        ...mappingState.mappedSamplesByMIDINumber,
+        [midiNumber]: mappedSamples,
+      },
+    };
+  };
+
+  $effect(() => {
     const onGate = (midiNumber: number) => {
       gatedNotes[midiNumber] = true;
 
       if (isLearningMIDIMapping) {
         selectedMIDINumber = midiNumber;
-        state.mappedSamplesByMIDINumber[midiNumber] = [
-          ...(state.mappedSamplesByMIDINumber[midiNumber] ?? []),
+        setMappedSamples(midiNumber, [
+          ...(mappingState.mappedSamplesByMIDINumber[midiNumber] ?? []),
           buildDefaultMappedSampleData(),
-        ];
+        ]);
         isLearningMIDIMapping = false;
       }
     };
@@ -41,17 +55,18 @@
     };
 
     const { unregister } = registerGateUngateCallbacks(onGate, onUngate);
-    unregisterGateCBs = unregister;
-  }
+    return unregister;
+  });
 
-  onDestroy(() => unregisterGateCBs?.());
-
-  $: noteIDsToRender = state.showUnmappedNotesInListing
-    ? MIDI_NOTE_RANGE
-    : MIDI_NOTE_RANGE.filter(
-        midiNumber =>
-          (state.mappedSamplesByMIDINumber[midiNumber]?.length ?? 0) > 0 || gatedNotes[midiNumber]
-      );
+  let noteIDsToRender = $derived(
+    mappingState.showUnmappedNotesInListing
+      ? MIDI_NOTE_RANGE
+      : MIDI_NOTE_RANGE.filter(
+          midiNumber =>
+            (mappingState.mappedSamplesByMIDINumber[midiNumber]?.length ?? 0) > 0 ||
+            gatedNotes[midiNumber]
+        )
+  );
 
   const uniqueID = genRandomStringID();
 </script>
@@ -63,14 +78,19 @@
       <input
         type="checkbox"
         id={`${uniqueID}-show-unmapped-notes-toggle`}
-        bind:checked={state.showUnmappedNotesInListing}
+        checked={mappingState.showUnmappedNotesInListing}
+        onchange={evt =>
+          (mappingState = {
+            ...mappingState,
+            showUnmappedNotesInListing: evt.currentTarget.checked,
+          })}
       />
     </div>
     <div>
       {#if isLearningMIDIMapping}
         TODO
       {:else}
-        <button on:click={() => (isLearningMIDIMapping = true)}>Learn MIDI Mapping</button>
+        <button onclick={() => (isLearningMIDIMapping = true)}>Learn MIDI Mapping</button>
       {/if}
     </div>
   </div>
@@ -78,8 +98,8 @@
     {#each noteIDsToRender as midiNumber}
       <MappedNoteRow
         {midiNumber}
-        mappedSamples={state.mappedSamplesByMIDINumber[midiNumber]}
-        on:click={() => {
+        mappedSamples={mappingState.mappedSamplesByMIDINumber[midiNumber]}
+        onclick={() => {
           selectedMIDINumber = midiNumber === selectedMIDINumber ? null : midiNumber;
         }}
         isGated={!!gatedNotes[midiNumber]}
@@ -89,7 +109,10 @@
           onClose={() => {
             selectedMIDINumber = null;
           }}
-          bind:mappedSamples={state.mappedSamplesByMIDINumber[midiNumber]}
+          bind:mappedSamples={
+            () => mappingState.mappedSamplesByMIDINumber[midiNumber],
+            mappedSamples => setMappedSamples(midiNumber, mappedSamples)
+          }
         />
       {/if}
     {/each}

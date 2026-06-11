@@ -4,8 +4,12 @@
   import ReactShim from 'src/misc/ReactShim.svelte';
   import { DragHandle } from './DnD';
 
-  export let activateDrag: () => void;
-  export let style: React.CSSProperties | undefined = undefined;
+  interface Props {
+    activateDrag: () => void;
+    style?: React.CSSProperties | undefined;
+  }
+
+  let { activateDrag, style = undefined }: Props = $props();
 </script>
 
 <ReactShim Component={DragHandle} props={{ activateDrag, style }} />

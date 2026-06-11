@@ -1,5 +1,5 @@
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio';
-import { mkSvelteComponentShim } from 'src/svelteUtils';
+import { mkSvelteComponentShim } from 'src/svelteUtils.svelte';
 import NativeCompressorSmallView from './NativeCompressorSmallView.svelte';
 
 interface NativeCompressorSmallViewShimProps {

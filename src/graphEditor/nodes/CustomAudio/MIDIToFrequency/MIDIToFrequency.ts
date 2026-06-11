@@ -6,7 +6,7 @@ import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio'
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { MIDINode, type MIDIInputCbs } from 'src/patchNetwork/midiNode';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import { midiToFrequency } from 'src/util';
 import MidiToFrequencySmallView from './MIDIToFrequencySmallView.svelte';
 import { RegateMode } from './RegateMode';

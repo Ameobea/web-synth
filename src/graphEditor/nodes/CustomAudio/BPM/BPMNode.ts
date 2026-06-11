@@ -5,7 +5,7 @@ import BpmNodeSmallView from 'src/graphEditor/nodes/CustomAudio/BPM/BPMNodeSmall
 import type { ForeignNode } from 'src/graphEditor/nodes/CustomAudio/CustomAudio';
 import type { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
-import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils';
+import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 
 export class BPMNode implements ForeignNode {
   private vcId: string | undefined;

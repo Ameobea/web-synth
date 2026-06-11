@@ -6,18 +6,33 @@
   import { type EqualizerBand } from 'src/equalizer/equalizer';
   import { mkBandParamDisplay } from './BandParamDisplay';
 
-  export let isBypassed: boolean;
-  export let setIsBypassed: (isBypassed: boolean) => void;
-  export let animateAutomatedParams: boolean;
-  export let setAnimateAutomatedParams: (animate: boolean) => void;
-  export let reset: () => void;
-  export let band: EqualizerBand;
-  export let bandIx: number;
-  export let onChange: (newBand: EqualizerBand) => void;
-  export let onDelete: () => void;
-  export let automatedParams: { freq: number | null; gain: number | null; q: number | null };
+  interface Props {
+    isBypassed: boolean;
+    setIsBypassed: (isBypassed: boolean) => void;
+    animateAutomatedParams: boolean;
+    setAnimateAutomatedParams: (animate: boolean) => void;
+    reset: () => void;
+    band: EqualizerBand;
+    bandIx: number;
+    onChange: (newBand: EqualizerBand) => void;
+    onDelete: () => void;
+    automatedParams: { freq: number | null; gain: number | null; q: number | null };
+  }
 
-  $: lowOrderFilterType = (() => {
+  let {
+    isBypassed,
+    setIsBypassed,
+    animateAutomatedParams,
+    setAnimateAutomatedParams,
+    reset,
+    band,
+    bandIx,
+    onChange,
+    onDelete,
+    automatedParams
+  }: Props = $props();
+
+  let lowOrderFilterType = $derived((() => {
     switch (band.filterType) {
       case EqualizerFilterType.Order4Lowpass:
       case EqualizerFilterType.Order8Lowpass:
@@ -30,9 +45,9 @@
       default:
         return band.filterType;
     }
-  })();
+  })());
 
-  $: curFilterOrder = (() => {
+  let curFilterOrder = $derived((() => {
     switch (band.filterType) {
       case EqualizerFilterType.Order4Lowpass:
       case EqualizerFilterType.Order4Highpass:
@@ -46,10 +61,9 @@
       default:
         return 2 as const;
     }
-  })();
+  })());
 
-  let settings: ControlPanelSetting[] = [];
-  $: settings = (() => {
+  let settings: ControlPanelSetting[] = $derived.by(() => {
     const settings: ControlPanelSetting[] = [
       { type: 'checkbox', label: 'bypass' },
       {
@@ -103,16 +117,16 @@
     });
 
     return settings;
-  })();
+  });
 
-  $: state = {
+  let cpState = $derived({
     bypass: isBypassed,
     'filter type': `${lowOrderFilterType}`,
     'filter order': `${curFilterOrder}`,
     freq: band.frequency,
     gain: band.gain,
     q: band.q,
-  };
+  });
 
   const handleChange = (key: string, value: any) => {
     const newBand = { ...band };
@@ -193,10 +207,10 @@
     onChange(newBand);
   };
 
-  $: globalState = {
+  let globalState = $derived({
     bypass: isBypassed,
     'animate automated params': animateAutomatedParams,
-  };
+  });
 
   const handleGlobalChange = (key: string, value: any) => {
     switch (key) {
@@ -211,7 +225,7 @@
     }
   };
 
-  const globalSettings: ControlPanelSetting[] = [
+  const globalSettings: ControlPanelSetting[] = $derived([
     {
       type: 'checkbox',
       label: 'bypass',
@@ -220,8 +234,8 @@
       type: 'checkbox',
       label: 'animate automated params',
     },
-    { type: 'button', label: 'reset', action: reset },
-  ];
+    { type: 'button', label: 'reset', action: () => reset() },
+  ]);
 </script>
 
 <div class="root">
@@ -233,7 +247,7 @@
   />
   <SvelteControlPanel
     {settings}
-    {state}
+    state={cpState}
     onChange={handleChange}
     width={460}
     title={`Band ${bandIx + 1}`}

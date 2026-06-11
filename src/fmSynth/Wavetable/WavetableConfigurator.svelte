@@ -1,13 +1,16 @@
-<script context="module" lang="ts">
-  enum Route {
-    BrowseWavetables,
-    ImportWavetable,
-    BuildWavetable,
-  }
+<script module lang="ts">
+  const Route = {
+    BrowseWavetables: 'BrowseWavetables',
+    ImportWavetable: 'ImportWavetable',
+    BuildWavetable: 'BuildWavetable',
+  } as const;
+
+  type Route = (typeof Route)[keyof typeof Route];
 </script>
 
 <script lang="ts">
   import * as Comlink from 'comlink';
+  import { untrack } from 'svelte';
 
   import {
     getWavetablePreset,
@@ -26,16 +29,21 @@
   import { SAMPLE_RATE } from 'src/util';
   import { WrappedUploadWavetableModal } from './ImportWavetableShim';
 
-  export let onSubmit: (val: WavetableBank) => void;
-  export let onCancel: () => void;
-  export let curPreset: WavetablePreset | undefined = undefined;
+  interface Props {
+    onSubmit: (val: WavetableBank) => void;
+    onCancel: () => void;
+    curPreset?: WavetablePreset | undefined;
+  }
+
+  let { onSubmit, onCancel, curPreset = undefined }: Props = $props();
 
   const worker: Comlink.Remote<WavetableConfiguratorWorker> = Comlink.wrap(
     new Worker(new URL('./WavetableConfiguratorWorker.worker.ts', import.meta.url), { type: 'module' })
   );
 
-  let initialPreset = curPreset;
-  let route: Route = initialPreset ? Route.BuildWavetable : Route.BrowseWavetables;
+  let route: Route = $state(
+    untrack(() => (curPreset ? Route.BuildWavetable : Route.BrowseWavetables))
+  );
 
   const renderPresetToBank = async (
     preset: WavetablePreset,
@@ -135,7 +143,6 @@
       initialInstState={curPreset}
       onSubmit={handleBuildWavetableSubmit}
       onCancel={() => {
-        initialPreset = undefined;
         route = Route.BrowseWavetables;
       }}
       {worker}
