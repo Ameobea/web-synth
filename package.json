@@ -40,6 +40,7 @@
     "lint": "eslint \"./src/**/*.@(ts|tsx|js|jsx)\"",
     "svelte-check": "svelte-check --tsconfig ./tsconfig.json",
     "typecheck": "tsc --noEmit",
+    "test:unit": "node --test \"test/**/*.test.ts\"",
     "prettier": "prettier --write \"src/**/*.{ts,js,tsx}\"",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run --browser chrome",

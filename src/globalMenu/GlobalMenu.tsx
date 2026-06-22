@@ -22,7 +22,8 @@ import HelpIcon from 'src/misc/HelpIcon';
 import type { ControlPanelSetting } from 'src/controls/SvelteControlPanel/types';
 import TapInBPMSvelte from './TapInBPM.svelte';
 import { mkSvelteComponentShim } from 'src/svelteUtils.svelte';
-import { globalTempoCSN, setGlobalBpm } from './globalTempo';
+import { setGlobalBpm, tempoChangesStore } from './globalTempo';
+import { useMappedWritableValue } from 'src/reactUtils';
 
 const TapInBPM = mkSvelteComponentShim<{ onSubmit: (bpm: number) => void }>(TapInBPMSvelte);
 
@@ -49,7 +50,15 @@ const RetractGlobalMenuButton: React.FC<RetractGlobalMenuButtonProps> = ({ onClo
 );
 
 const GlobalTempoControl: React.FC = () => {
-  const [tempo, setTempo] = useState<string>(globalTempoCSN.offset.value.toFixed(1));
+  const baseBpm = useMappedWritableValue(tempoChangesStore, changes => changes[0].bpm);
+  const [tempo, setTempo] = useState<string>(baseBpm.toFixed(1));
+  const lastExternalBpm = useRef(baseBpm);
+  useEffect(() => {
+    if (baseBpm !== lastExternalBpm.current) {
+      lastExternalBpm.current = baseBpm;
+      setTempo(baseBpm.toFixed(1));
+    }
+  }, [baseBpm]);
 
   return (
     <div className='global-tempo-control'>

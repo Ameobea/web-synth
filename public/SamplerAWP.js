@@ -44,7 +44,8 @@ class SamplerAWP extends AudioWorkletProcessor {
       throw new Error('SamplerAWP requires a mailboxID to be passed in processorOptions');
     }
     this.mailboxID = processorOptions.mailboxID;
-    globalThis.midiEventMailboxRegistry.addMailbox(processorOptions.mailboxID);
+    // Lazily created on first poll once `globalThis.transport` exists (the scheduler owns it).
+    this.midiClient = null;
   }
 
   getWasmMemoryBuffer() {
@@ -144,29 +145,31 @@ class SamplerAWP extends AudioWorkletProcessor {
   }
 
   checkMailbox() {
-    if (!this.mailboxID) {
+    if (!this.mailboxID || !globalThis.transport) {
       return;
     }
+    if (!this.midiClient) {
+      this.midiClient = globalThis.transport.createClient(this.mailboxID);
+    }
 
-    let msg;
-    while ((msg = globalThis.midiEventMailboxRegistry.getEvent(this.mailboxID))) {
-      const { eventType, param1 } = msg;
-      switch (eventType) {
+    for (const e of globalThis.transport.pollMIDI(this.midiClient, currentFrame)) {
+      const note = e.param0;
+      switch (e.type) {
         case 0: {
-          this.wasmInstance.exports.sampler_handle_midi_attack(this.ctxPtr, param1);
+          this.wasmInstance.exports.sampler_handle_midi_attack(this.ctxPtr, note);
           if (this.transmitMIDIAttack) {
-            this.port.postMessage({ type: 'midiAttack', midiNumber: param1 });
+            this.port.postMessage({ type: 'midiAttack', midiNumber: note });
             this.transmitMIDIAttack = false;
           }
           if (this.midiGateStatusF32) {
-            this.midiGateStatusF32[param1] = 1;
+            this.midiGateStatusF32[note] = 1;
             Atomics.notify(this.midiGateStatusI32, MIDI_GATE_STATUS_BUFFER_UPDATED_IX);
           }
           break;
         }
         case 1: {
           if (this.midiGateStatusF32) {
-            this.midiGateStatusF32[param1] = 0;
+            this.midiGateStatusF32[note] = 0;
             Atomics.notify(this.midiGateStatusI32, MIDI_GATE_STATUS_BUFFER_UPDATED_IX);
           }
           break;

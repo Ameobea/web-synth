@@ -36,12 +36,9 @@ class FMSynthAWP extends AudioWorkletProcessor {
   constructor({ processorOptions }) {
     super();
 
-    if (processorOptions?.mailboxID) {
-      this.mailboxID = processorOptions.mailboxID;
-      globalThis.midiEventMailboxRegistry.addMailbox(processorOptions.mailboxID);
-    } else {
-      this.mailboxID = null;
-    }
+    this.mailboxID = processorOptions?.mailboxID ?? null;
+    // Lazily created on first poll once `globalThis.transport` exists (the scheduler owns it).
+    this.midiClient = null;
 
     this.wasmInstance = null;
     this.lastStateByOperatorIx = null;
@@ -588,43 +585,30 @@ class FMSynthAWP extends AudioWorkletProcessor {
   }
 
   checkMailbox() {
-    if (!this.mailboxID) {
+    if (!this.mailboxID || !globalThis.transport) {
       return;
     }
+    if (!this.midiClient) {
+      this.midiClient = globalThis.transport.createClient(this.mailboxID);
+    }
 
-    let msg;
-    while ((msg = globalThis.midiEventMailboxRegistry.getEvent(this.mailboxID))) {
-      const { eventType, param1, param2 } = msg;
-      switch (eventType) {
+    // Phase 1 ignores `e.sampleOffset`; honoring it is Phase 2 (sub-frame onset in the FM voice).
+    for (const e of globalThis.transport.pollMIDI(this.midiClient, currentFrame)) {
+      switch (e.type) {
         case 0: // Attack
-          if (!this.wasmInstance) {
-            console.warn('Tried gating before Wasm instance loaded');
-            break;
-          }
-
-          this.wasmInstance.exports.gate(this.ctxPtr, param1, param2);
+          this.wasmInstance.exports.gate(this.ctxPtr, e.param0, e.param1);
           break;
         case 1: // Release
-          if (!this.wasmInstance) {
-            console.warn('Tried un-gating before Wasm instance loaded');
-            break;
-          }
-
-          this.wasmInstance.exports.ungate(this.ctxPtr, param1);
+          this.wasmInstance.exports.ungate(this.ctxPtr, e.param0);
           break;
         case 2: // Pitch bend
           console.error('Pitch bend not implemented');
           break;
         case 3: // Clear All
-          if (!this.wasmInstance) {
-            console.warn('Tried clearing all before Wasm instance loaded');
-            break;
-          }
-
           this.wasmInstance.exports.ungate_all(this.ctxPtr);
           break;
         default:
-          console.error('Unhandled MIDI event type', evt);
+          console.error('Unhandled MIDI event type', e.type);
       }
     }
   }

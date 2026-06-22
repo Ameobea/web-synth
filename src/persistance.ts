@@ -5,7 +5,7 @@ import { Either } from 'funfix-core';
 import { getLoadedComposition } from 'src/api';
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { stopAll } from 'src/eventScheduler/eventScheduler';
-import { setGlobalBpm } from 'src/globalMenu/globalTempo';
+import { loadTempoFromComposition } from 'src/globalMenu/globalTempo';
 import { actionCreators, dispatch, getState } from 'src/redux';
 import { commitForeignConnectables } from 'src/redux/modules/vcmUtils';
 import { AsyncOnce, getEngine } from 'src/util';
@@ -48,13 +48,9 @@ export const reinitializeWithComposition = (
   // Rehydrate `localStorage` with parsed composition
   Object.entries(deserialized).forEach(([key, val]) => localStorage.setItem(key, val));
 
-  if (
-    typeof deserialized.globalTempo === 'string' ||
-    typeof deserialized.globalTempo === 'number'
-  ) {
-    console.log('Setting global tempo to', deserialized.globalTempo);
-    setGlobalBpm(+deserialized.globalTempo);
-  }
+  // Apply tempo from the composition body (authoritative — see `loadTempoFromComposition`); pushes
+  // it to the clock owner and the readable BPM output.
+  loadTempoFromComposition(deserialized);
 
   if (!R.isNil(compositionBody.id)) {
     setCurLoadedCompositionId(compositionBody.id);
@@ -152,13 +148,9 @@ export const loadSharedComposition = async (
     }
   });
 
-  if (
-    typeof deserialized.globalTempo === 'string' ||
-    typeof deserialized.globalTempo === 'number'
-  ) {
-    console.log('Setting global tempo to', deserialized.globalTempo);
-    setGlobalBpm(+deserialized.globalTempo);
-  }
+  // Apply tempo from the composition body (authoritative — see `loadTempoFromComposition`); pushes
+  // it to the clock owner and the readable BPM output.
+  loadTempoFromComposition(deserialized);
 };
 
 export const getCurLoadedCompositionId = async (): Promise<number | null> => {

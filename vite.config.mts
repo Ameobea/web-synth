@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { rolldown } from 'rolldown';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { sveltePreprocess } from 'svelte-preprocess';
@@ -33,6 +34,41 @@ export const svgRaw = (): Plugin => ({
   },
 });
 
+// Bundles `transport.worklet-entry.ts` into a classic script exposing the transport classes on
+// `globalThis`, loaded into the AudioWorklet scope via `addModule('transport.js')`.  Served from
+// source in dev and emitted at build time, so there's no committed/generated artifact to drift.
+const buildTransportWorklet = async (): Promise<string> => {
+  const bundle = await rolldown({
+    input: resolve(__dirname, 'src/eventScheduler/transport.worklet-entry.ts'),
+    logLevel: 'silent',
+  });
+  const { output } = await bundle.generate({ format: 'iife', name: 'WebSynthTransportBundle' });
+  await bundle.close();
+  return output[0].code;
+};
+
+export const transportWorklet = (): Plugin => ({
+  name: 'transport-worklet',
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      if (req.url?.split('?')[0] !== '/transport.js') {
+        next();
+        return;
+      }
+      buildTransportWorklet().then(
+        code => {
+          res.setHeader('Content-Type', 'text/javascript');
+          res.end(code);
+        },
+        err => next(err)
+      );
+    });
+  },
+  async generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'transport.js', source: await buildTransportWorklet() });
+  },
+});
+
 const crossOriginIsolationHeaders = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -45,6 +81,7 @@ export default defineConfig(({ mode }) => {
     svelte({ preprocess: [sveltePreprocess({ typescript: {} })] }),
     svgRaw(),
     inlineCSS(),
+    transportWorklet(),
   ];
   if (mode === 'production' && env.SENTRY_AUTH_TOKEN) {
     plugins.push(

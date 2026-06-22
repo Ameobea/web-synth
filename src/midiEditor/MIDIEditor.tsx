@@ -18,7 +18,12 @@ import { CVOutputTopControls } from 'src/midiEditor/CVOutput/CVOutputTopControls
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
 import { MIDIEditorControlButton } from 'src/midiEditor/MIDIEditorControlButton';
 import BasicModal from 'src/misc/BasicModal';
-import { mkImageLoadPlaceholder, useWindowSize } from 'src/reactUtils';
+import {
+  mkImageLoadPlaceholder,
+  useMappedWritableValue,
+  useWindowSize,
+  useWritableValue,
+} from 'src/reactUtils';
 import { getIsVcHidden } from 'src/ViewContextManager/VcHideStatusRegistry';
 import { mkSvelteComponentShim } from 'src/svelteUtils.svelte';
 import { MIDIWasmModule } from 'src/midiWasmModule';
@@ -27,6 +32,8 @@ import type { ADSR2Instance } from 'src/controls/adsr2/adsr2';
 import CVOutputControls from './CVOutput/CVOutputControls.svelte';
 import './CVOutput/CVOutputControls.css';
 import CollapsedMIDIEditor from 'src/midiEditor/CollapsedMIDIEditor.svelte';
+import TempoTrack from 'src/midiEditor/TempoTrack/TempoTrack.svelte';
+import { getGlobalBpm, setGlobalBpm, tempoChangesStore } from 'src/globalMenu/globalTempo';
 import { PIANO_KEYBOARD_WIDTH } from 'src/midiEditor/conf';
 import MIDIEditorUIInstance from 'src/midiEditor/MIDIEditorUIInstance';
 import type { ManagedInstance, MIDIEditorUIManager } from 'src/midiEditor/MIDIEditorUIManager';
@@ -235,6 +242,12 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
     parentInst.uiManager.velocityDisplayEnabled
   );
   const [metronomeEnabled, setMetronomeEnabled] = useState(initialState.metronomeEnabled);
+  const tempoTrackOpen = useWritableValue(parentInst.tempoTrackOpen);
+  // Keep the BPM field in sync with the global base tempo (edited here, via the tempo track, or on load).
+  const baseBpm = useMappedWritableValue(tempoChangesStore, changes => changes[0].bpm);
+  useEffect(() => {
+    setState(s => (s.bpm === baseBpm ? s : { ...s, bpm: baseBpm }));
+  }, [baseBpm]);
   const onChange = (newState: MIDIEditorControlsState) => {
     onChangeInner(newState);
     setState(newState);
@@ -363,6 +376,13 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
         title='Toggle velocity display'
         style={{ fontSize: 24, textAlign: 'center', lineHeight: '36px' }}
         active={velocityDisplayEnabled}
+      />
+      <MIDIEditorControlButton
+        onClick={() => parentInst.tempoTrackOpen.set(!parentInst.tempoTrackOpen.current)}
+        label='♩='
+        title='Toggle tempo track'
+        style={{ fontSize: 20, textAlign: 'center', lineHeight: '36px' }}
+        active={tempoTrackOpen}
       />
       <MIDIEditorControlButton
         onClick={() => {
@@ -555,6 +575,8 @@ const CVOutputControlsShim = mkSvelteComponentShim(CVOutputControls);
 
 const CollapsedMIDIEditorShim = mkSvelteComponentShim(CollapsedMIDIEditor);
 
+const TempoTrackShim = mkSvelteComponentShim(TempoTrack);
+
 const EditableInstanceNameShim = mkSvelteComponentShim(EditableInstanceName);
 
 interface MIDIEditorInstanceCompProps {
@@ -714,7 +736,7 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
   vcId,
 }) => {
   const initialStateForControls = useRef({
-    bpm: initialState.localBPM ?? 120,
+    bpm: getGlobalBpm(),
     loopEnabled: !R.isNil(initialState.loopPoint),
     beatsPerMeasure: initialState.view.beatsPerMeasure,
     beatSnapInterval: initialState.beatSnapInterval,
@@ -735,12 +757,14 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
 
   const handleChange = useCallback(
     ({ bpm, loopEnabled, beatsPerMeasure }: MIDIEditorControlsState) => {
-      parentInstance.localBPM = bpm;
+      setGlobalBpm(bpm);
       parentInstance.setLoopEnabled(loopEnabled);
       parentInstance.setBeatsPerMeasure(beatsPerMeasure);
     },
     [parentInstance]
   );
+
+  const tempoTrackOpen = useWritableValue(parentInstance.tempoTrackOpen);
 
   const lastCanvasRefsByInstID = useRef<{ [key: string]: HTMLCanvasElement }>({});
   const [instances, setInstances] = useState<ManagedInstance[]>([]);
@@ -776,6 +800,13 @@ const MIDIEditor: React.FC<MIDIEditorProps> = ({
           playbackHandler={parentInstance.playbackHandler}
         />
         <div className='spacer' style={{ height: 64 }} />
+        {tempoTrackOpen ? (
+          <TempoTrackShim
+            parentInstance={parentInstance}
+            pxPerBeat={parentInstance.baseView.pxPerBeatStore}
+            scrollHorizontalBeats={parentInstance.baseView.scrollHorizontalBeatsStore}
+          />
+        ) : null}
         <div>
           {instances.map((instance, instIx) => {
             if (instance.type === 'midiEditor') {

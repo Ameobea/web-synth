@@ -1,5 +1,5 @@
-import { globalTempoCSN } from 'src/globalMenu/globalTempo';
 import { getSentry } from 'src/sentry';
+import type { TempoChange } from 'src/eventScheduler/transport';
 import { UnimplementedError, UnreachableError, retryAsync } from 'src/util';
 import { writable, type Writable } from 'svelte/store';
 
@@ -36,6 +36,7 @@ type PendingEvent =
     };
 
 let PendingEvents: PendingEvent[] = [];
+let PendingTempoChanges: TempoChange[] | null = null;
 
 const ctx = new AudioContext();
 let SchedulerHandle: AudioWorkletNode | null = null;
@@ -190,20 +191,25 @@ export const getCurGlobalBPM = () => {
   return beatManagerSAB[1];
 };
 
-// Init the scheduler AWP instance
+const cacheBust = () =>
+  window.location.host.includes('localhost') ? '' : genRandomStringID();
+
+// Init the scheduler AWP instance.  `transport.js` (the shared transport primitive) must be added
+// to the worklet scope before the scheduler module, which references `globalThis.WebSynthTransport`
+// at module-eval time, so those two `addModule`s are sequenced.
 export const EventSchedulerInitialized = Promise.all([
   retryAsync(() =>
-    fetch(
-      process.env.ASSET_PATH +
-        'event_scheduler.wasm?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : genRandomStringID())
-    ).then(res => res.arrayBuffer())
+    fetch(process.env.ASSET_PATH + 'event_scheduler.wasm?cacheBust=' + cacheBust()).then(res =>
+      res.arrayBuffer()
+    )
   ),
   retryAsync(() =>
-    ctx.audioWorklet.addModule(
-      process.env.ASSET_PATH +
-        'EventSchedulerWorkletProcessor.js?cacheBust=' +
-        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+    ctx.audioWorklet.addModule(process.env.ASSET_PATH + 'transport.js?cacheBust=' + cacheBust())
+  ).then(() =>
+    retryAsync(() =>
+      ctx.audioWorklet.addModule(
+        process.env.ASSET_PATH + 'EventSchedulerWorkletProcessor.js?cacheBust=' + cacheBust()
+      )
     )
   ),
 ] as const)
@@ -212,7 +218,6 @@ export const EventSchedulerInitialized = Promise.all([
       channelInterpretation: 'discrete',
       channelCountMode: 'explicit',
     });
-    globalTempoCSN.connect((SchedulerHandle.parameters as any).get('global_tempo_bpm'));
     SchedulerHandle.port.onmessage = evt => {
       if (typeof evt.data === 'number') {
         callCb(evt.data);
@@ -223,19 +228,23 @@ export const EventSchedulerInitialized = Promise.all([
       }
     };
     SchedulerHandle.port.postMessage({ type: 'init', wasmArrayBuffer });
+    if (PendingTempoChanges) {
+      SchedulerHandle.port.postMessage({ type: 'setTempoChanges', changes: PendingTempoChanges });
+      PendingTempoChanges = null;
+    }
     PendingEvents.forEach(evt => {
       if (evt.type === 'schedule') {
         const { time, beats, payload } = evt;
         if (time === null) {
           if (payload.type === 'midi') {
             SchedulerHandle!.port.postMessage({
-              type: 'scheduleBeats',
-              beats,
-              cbId: payload.cbId,
-              mailboxID: payload.mailboxID,
-              midiEventtype: payload.eventType,
+              type: 'scheduleMIDI',
+              targetID: payload.mailboxID,
+              beat: beats,
+              eventType: payload.eventType,
               param0: payload.param0,
               param1: payload.param1,
+              id: payload.cbId,
             });
           } else {
             SchedulerHandle!.port.postMessage({ type: 'scheduleBeats', beats, cbId: payload.cbId });
@@ -247,8 +256,14 @@ export const EventSchedulerInitialized = Promise.all([
           SchedulerHandle!.port.postMessage({ type: 'schedule', time, cbId: payload.cbId });
         }
       } else if (evt.type === 'interactiveMIDIEvent') {
-        const { eventType, param0, param1 } = evt;
-        SchedulerHandle!.port.postMessage({ type: 'postMIDIEvent', eventType, param0, param1 });
+        const { mailboxID, eventType, param0, param1 } = evt;
+        SchedulerHandle!.port.postMessage({
+          type: 'insertLiveMIDI',
+          targetID: mailboxID,
+          eventType,
+          param0,
+          param1,
+        });
       } else {
         throw new UnreachableError();
       }
@@ -322,13 +337,13 @@ export const scheduleMIDIEventBeats = (
   }
 
   SchedulerHandle.port.postMessage({
-    type: 'scheduleBeats',
-    cbId,
-    beats,
-    mailboxID,
-    midiEventType: eventType,
+    type: 'scheduleMIDI',
+    targetID: mailboxID,
+    beat: beats,
+    eventType,
     param0,
     param1,
+    id: cbId,
   });
   return cbId;
 };
@@ -358,7 +373,26 @@ export const postMIDIEventToAudioThread = (
     return;
   }
 
-  SchedulerHandle.port.postMessage({ type: 'postMIDIEvent', mailboxID, eventType, param0, param1 });
+  SchedulerHandle.port.postMessage({
+    type: 'insertLiveMIDI',
+    targetID: mailboxID,
+    eventType,
+    param0,
+    param1,
+  });
+};
+
+/**
+ * Pushes the composition-global tempo automation to the clock owner.  Called by the tempo registry
+ * whenever the tempo changes; replaces driving a constant-source node into a scheduler AudioParam.
+ */
+export const setTempoChanges = (changes: TempoChange[]) => {
+  if (!SchedulerHandle) {
+    PendingTempoChanges = changes;
+    return;
+  }
+
+  SchedulerHandle.port.postMessage({ type: 'setTempoChanges', changes });
 };
 
 export interface EventToReschedule {

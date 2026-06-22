@@ -13,7 +13,8 @@ import {
   mkContainerRenderHelper,
   mkContainerUnhider,
 } from 'src/reactUtils';
-import { UnreachableError } from 'src/util';
+import { rwritable, type TransparentWritable, UnreachableError } from 'src/util';
+import { getTempoChanges } from 'src/globalMenu/globalTempo';
 
 interface OldMIDIEditorView {
   /**
@@ -83,6 +84,7 @@ export interface SerializedMIDIEditorState {
   beatSnapInterval: number;
   cursorPosBeats: number;
   velocityDisplayEnabled?: boolean;
+  tempoTrackOpen?: boolean;
 }
 
 export const serializeNoteStore = (notes: NoteStore): SerializedMIDILine[] => {
@@ -219,12 +221,15 @@ export class MIDIEditorInstance {
   public beatSnapInterval: number;
   public playbackHandler: MIDIEditorPlaybackHandler;
   public uiManager: MIDIEditorUIManager;
+  /** Whether the tempo-change track is shown.  Defaults to visible when tempo automation exists. */
+  public tempoTrackOpen: TransparentWritable<boolean>;
 
   constructor(ctx: AudioContext, vcId: string, initialState: SerializedMIDIEditorState) {
     this.vcId = vcId;
     this.baseView = new ProxyMIDIEditorBaseView(initialState.view);
     this.localBPM = initialState.localBPM;
     this.beatSnapInterval = initialState.beatSnapInterval;
+    this.tempoTrackOpen = rwritable(initialState.tempoTrackOpen ?? getTempoChanges().length > 1);
 
     this.playbackHandler = new MIDIEditorPlaybackHandler(this, initialState);
 
@@ -244,6 +249,7 @@ export class MIDIEditorInstance {
       version: 2,
       view: this.baseView.inner,
       velocityDisplayEnabled: this.uiManager.velocityDisplayEnabled,
+      tempoTrackOpen: this.tempoTrackOpen.current,
     };
   }
 
