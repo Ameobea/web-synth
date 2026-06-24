@@ -177,7 +177,7 @@ class RampHandle {
       }
       case 'instant': {
         return new PIXI.Point(
-          rampStartPx + rampWidthPx,
+          rampStartPx + 0.5 * rampWidthPx,
           this.inst.height - this.startStep.y * this.inst.height
         );
       }
@@ -245,12 +245,7 @@ class RampHandle {
         break;
       }
       case 'instant': {
-        const transformedX = computeTransformedXPosition(
-          this.renderedRegion,
-          this.inst.width,
-          this.endStep.x
-        );
-        this.graphics.position.set(transformedX, (1 - this.startStep.y) * this.inst.height);
+        this.graphics.position.copyFrom(this.computeInitialPos());
         break;
       }
       default: {
@@ -260,6 +255,12 @@ class RampHandle {
   }
 
   private handleDrag(newPos: PIXI.Point) {
+    // Instant transitions have no curve to shape, so the handle is fixed and only serves as a
+    // double-click/right-click target for changing the transition mode.
+    if (this.endStep.ramper.type === 'instant') {
+      return;
+    }
+
     // Always constrain drags to the area defined by the marks, except for bezier
     // curve which can have its handle's Y coord go outside of the Y bounds of the
     // start/end points.
@@ -1657,6 +1658,14 @@ const ADSR2: React.FC<ADSR2Props> = ({
   const lastSize = useRef({ width, height });
   const instance = useRef<ADSR2Instance | null>(null);
   const [outputRangeStart, outputRangeEnd] = initialState.outputRange;
+
+  useEffect(
+    () => () => {
+      instance.current?.destroy();
+      instance.current = null;
+    },
+    []
+  );
 
   useEffect(() => {
     if (!instance.current || !instance.current.app?.view) {

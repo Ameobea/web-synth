@@ -198,7 +198,7 @@ export class BuildWavetableInstance {
     initialState?: BuildWavetableInstanceState
   ) {
     if (initialState) {
-      this.state = initialState;
+      this.state = R.clone(initialState);
     }
     this.renderedWavetableRef = renderedWavetableRef;
     this.worker = worker;

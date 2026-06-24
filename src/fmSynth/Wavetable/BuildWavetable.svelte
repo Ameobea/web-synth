@@ -94,7 +94,7 @@ return new Array(64).fill(null).map((_, i) => i === 0 ? 0 : (1 / i));
       inst?.setState(presetState.waveforms[activeWaveformIx].instState);
 
       worker
-        .renderWavetable(presetState.waveforms.map(w => w.instState))
+        .renderWavetable($state.snapshot(presetState.waveforms.map(w => w.instState)))
         .then(newRenderedWaveformSamples => {
           renderedWavetableRef.renderedWavetable = newRenderedWaveformSamples;
         })
@@ -132,7 +132,7 @@ return new Array(64).fill(null).map((_, i) => i === 0 ? 0 : (1 / i));
         renderedWaveformSamplesBase64: '',
       });
       const newRenderedWaveformSamples: Float32Array[] = await worker.renderWavetable(
-        presetState.waveforms.map(w => w.instState)
+        $state.snapshot(presetState.waveforms.map(w => w.instState))
       );
       renderedWavetableRef.renderedWavetable = newRenderedWaveformSamples;
 
@@ -159,7 +159,7 @@ return new Array(64).fill(null).map((_, i) => i === 0 ? 0 : (1 / i));
 
     try {
       const newRenderedWaveformSamples: Float32Array[] = await worker.renderWavetable(
-        presetState.waveforms.map(w => w.instState)
+        $state.snapshot(presetState.waveforms.map(w => w.instState))
       );
       renderedWavetableRef.renderedWavetable = newRenderedWaveformSamples;
     } catch (err) {

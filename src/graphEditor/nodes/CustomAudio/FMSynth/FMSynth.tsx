@@ -89,7 +89,7 @@ export type RampFn =
     };
 
 export const encodeRampFnType = (rampFnType: RampFn['type']): number =>
-  ({ linear: 0, instant: 1, exponential: 2, bezier: 3 })[rampFnType];
+  ({ instant: 0, linear: 1, exponential: 2, bezier: 3 })[rampFnType];
 
 export const encodeRampFnParams = (
   startStep: AdsrStep | undefined,
