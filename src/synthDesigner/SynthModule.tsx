@@ -84,7 +84,7 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
           try {
             await saveSynthVoicePreset({ title, description: description ?? '', body: presetBody });
           } catch (_err) {
-            // cancelled
+            // modal cancelled or save failed (failures are reported to Sentry in `apiPost`)
           }
         },
       },

@@ -167,11 +167,15 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
             description: true,
           });
           const presetBody = getState().synthDesigner.synths.map(serializeSynthModule);
-          await saveSynthPreset({
-            title,
-            description: description ?? '',
-            body: { voices: presetBody },
-          });
+          try {
+            await saveSynthPreset({
+              title,
+              description: description ?? '',
+              body: { voices: presetBody },
+            });
+          } catch (_err) {
+            // already reported to Sentry in `apiPost`
+          }
         },
       },
     ];

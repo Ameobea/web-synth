@@ -1,7 +1,7 @@
 use diesel::{self, prelude::*};
 use fxhash::FxHashMap;
 use itertools::Itertools;
-use rocket::serde::json::Json;
+use rocket::{http::Status, serde::json::Json};
 
 use crate::{
   db_util::{
@@ -36,6 +36,19 @@ pub use self::subgraph_preset::*;
 
 #[get("/")]
 pub fn index() -> &'static str { "Application successfully started!" }
+
+/// Deserializes a request body that was accepted as raw JSON into a typed `T`, reporting the exact
+/// path of any schema mismatch (e.g. ``filterEnvelope.steps[1].ramper: missing field `...` ``)
+/// rather than an opaque 422.
+fn parse_request_body<T: serde::de::DeserializeOwned>(
+  body: serde_json::Value,
+) -> Result<T, (Status, String)> {
+  serde_path_to_error::deserialize(&body).map_err(|err| {
+    let msg = format!("Invalid request body at `{}`: {}", err.path(), err.inner());
+    error!("{msg}");
+    (Status::UnprocessableEntity, msg)
+  })
+}
 
 #[post("/effects", data = "<effect>")]
 pub async fn create_effect(
@@ -462,21 +475,23 @@ pub async fn get_synth_presets(
 #[post("/synth_presets", data = "<preset>")]
 pub async fn create_synth_preset(
   conn: WebSynthDbConn,
-  preset: Json<ReceivedSynthPresetEntry>,
+  preset: Json<serde_json::Value>,
   login_token: MaybeLoginToken,
-) -> Result<(), String> {
+) -> Result<(), (Status, String)> {
   use crate::schema::synth_presets;
+
+  let preset: ReceivedSynthPresetEntry = parse_request_body(preset.0)?;
 
   let user_id = get_logged_in_user_id(&conn, login_token).await;
 
-  let body: String = serde_json::to_string(&preset.body).map_err(|err| -> String {
-    let err_msg = format!("Error parsing provided synth preset body: {:?}", err);
-    error!("{err_msg}");
-    err_msg
+  let body: String = serde_json::to_string(&preset.body).map_err(|err| {
+    let msg = format!("Error serializing synth preset body: {err:?}");
+    error!("{msg}");
+    (Status::InternalServerError, msg)
   })?;
   let entry = NewSynthPresetEntry {
-    title: preset.0.title,
-    description: preset.0.description,
+    title: preset.title,
+    description: preset.description,
     body,
     user_id,
   };
@@ -488,9 +503,12 @@ pub async fn create_synth_preset(
         .execute(conn)
     })
     .await
-    .map_err(|err| -> String {
-      error!("Error inserting synth preset into database: {:?}", err);
-      "Error inserting synth preset into database".into()
+    .map_err(|err| {
+      error!("Error inserting synth preset into database: {err:?}");
+      (
+        Status::InternalServerError,
+        "Error inserting synth preset into database".into(),
+      )
     })
     .map(drop)
 }
@@ -552,21 +570,23 @@ pub async fn get_synth_voice_presets(
 #[post("/synth_voice_presets", data = "<voice_preset>")]
 pub async fn create_synth_voice_preset(
   conn: WebSynthDbConn,
-  voice_preset: Json<UserProvidedNewSynthVoicePreset>,
+  voice_preset: Json<serde_json::Value>,
   login_token: MaybeLoginToken,
-) -> Result<(), String> {
+) -> Result<(), (Status, String)> {
   use crate::schema::voice_presets;
+
+  let voice_preset: UserProvidedNewSynthVoicePreset = parse_request_body(voice_preset.0)?;
 
   let user_id = get_logged_in_user_id(&conn, login_token).await;
 
-  let body: String = serde_json::to_string(&voice_preset.0.body).map_err(|err| -> String {
-    let err_msg = format!("Error parsing provided synth preset body: {:?}", err);
-    error!("{}", err_msg);
-    err_msg
+  let body: String = serde_json::to_string(&voice_preset.body).map_err(|err| {
+    let msg = format!("Error serializing synth voice preset body: {err:?}");
+    error!("{msg}");
+    (Status::InternalServerError, msg)
   })?;
   let entry = NewSynthVoicePresetEntry {
-    title: voice_preset.0.title,
-    description: voice_preset.0.description,
+    title: voice_preset.title,
+    description: voice_preset.description,
     body,
     user_id,
   };
@@ -578,9 +598,12 @@ pub async fn create_synth_voice_preset(
         .execute(conn)
     })
     .await
-    .map_err(|err| -> String {
-      error!("Error inserting synth preset into database: {:?}", err);
-      "Error inserting synth preset into database".into()
+    .map_err(|err| {
+      error!("Error inserting synth voice preset into database: {err:?}");
+      (
+        Status::InternalServerError,
+        "Error inserting synth voice preset into database".into(),
+      )
     })
     .map(drop)
 }

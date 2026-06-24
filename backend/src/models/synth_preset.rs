@@ -106,12 +106,14 @@ pub struct FilterParams {
   #[serde(rename = "type")]
   pub filter_type: FilterType,
   pub frequency: f64,
-  #[serde(rename = "Q")]
+  #[serde(rename = "Q", default)]
   pub q: Option<f64>,
   #[serde(default)]
   pub gain: f64,
   #[serde(default)]
   pub detune: f64,
+  #[serde(flatten)]
+  pub rest: serde_json::Map<String, serde_json::Value>,
 }
 
 // export interface ADSRValue {
@@ -168,7 +170,10 @@ pub enum RampFn {
   #[serde(rename = "exponential")]
   Exponential { exponent: f32 },
   #[serde(rename = "bezier")]
-  Bezier { control_points: Vec<Point2D> },
+  Bezier {
+    #[serde(rename = "controlPoints")]
+    control_points: Vec<Point2D>,
+  },
 }
 
 // export interface AdsrStep {
@@ -198,6 +203,8 @@ pub struct Adsr {
   loop_point: Option<usize>,
   release_point: f32,
   audio_thread_data: AudioThreadData,
+  #[serde(flatten)]
+  rest: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -221,14 +228,17 @@ pub struct VoiceDefinition {
   fm_synth_config: serde_json::Value,
   filter: FilterParams,
   master_gain: f32,
+  #[serde(default)]
   gain_envelope: Option<ADSRValues>,
-  #[serde(rename = "gainADSRLength")]
+  #[serde(rename = "gainADSRLength", default)]
   gain_adsr_length: Option<f32>,
   filter_envelope: Adsr,
   #[serde(rename = "filterADSRLength")]
   filter_adsr_length: f32,
   #[serde(default = "default_pitch_multiplier")]
   pitch_multiplier: f32,
+  #[serde(flatten)]
+  rest: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -292,4 +302,49 @@ pub struct NewSynthVoicePresetEntry {
   pub description: String,
   pub body: String,
   pub user_id: Option<i64>,
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use serde_json::json;
+
+  /// A `VoiceDefinition` must accept a `bezier` ramper (with camelCase `controlPoints`) and
+  /// round-trip frontend-only fields that the backend doesn't model explicitly (`filterBypassed`,
+  /// `filterEnvelopeEnabled`, the filter's `bypass`, the envelope's `lengthMode`, ...) without
+  /// dropping them.
+  #[test]
+  fn voice_definition_roundtrip_preserves_unmodeled_fields() {
+    let input = json!({
+      "fmSynthConfig": {},
+      "filter": { "type": "lowpass", "frequency": 1000.0, "Q": 1.0, "bypass": false },
+      "masterGain": 0.5,
+      "filterEnvelope": {
+        "steps": [
+          { "x": 0.0, "y": 0.0, "ramper": { "type": "linear" } },
+          { "x": 1.0, "y": 1.0, "ramper": { "type": "bezier",
+            "controlPoints": [{ "x": 0.5, "y": 0.5 }, { "x": 0.6, "y": 0.6 }] } }
+        ],
+        "lenSamples": 1000.0,
+        "loopPoint": null,
+        "releasePoint": 0.5,
+        "audioThreadData": { "phaseIndex": 0 },
+        "lengthMode": 1,
+        "logScale": true
+      },
+      "filterADSRLength": 1000.0,
+      "filterBypassed": false,
+      "filterEnvelopeEnabled": true
+    });
+
+    let parsed: VoiceDefinition = serde_path_to_error::deserialize(&input)
+      .unwrap_or_else(|err| panic!("parse failed at `{}`: {}", err.path(), err.inner()));
+    let out = serde_json::to_value(&parsed).unwrap();
+
+    assert_eq!(out["filterEnvelope"]["steps"][1]["ramper"]["controlPoints"].as_array().unwrap().len(), 2);
+    assert_eq!(out["filterBypassed"], json!(false));
+    assert_eq!(out["filterEnvelopeEnabled"], json!(true));
+    assert_eq!(out["filter"]["bypass"], json!(false));
+    assert_eq!(out["filterEnvelope"]["lengthMode"], json!(1));
+  }
 }

@@ -11,23 +11,48 @@ import { getSentry, logError } from 'src/sentry';
 
 const buildURL = (path: string) => `${BACKEND_BASE_URL}${path}`;
 
+/**
+ * Performs an authenticated `POST` to the backend, capturing any failure (network error or non-2xx
+ * response) to Sentry along with the response body before re-throwing.  The response body now
+ * carries a descriptive schema-error message from the backend, so it's worth recording.
+ *
+ * Returns the `Response` on success so callers can read the body if they need it.
+ */
+const apiPost = async (
+  path: string,
+  body: unknown,
+  opts?: { headers?: Record<string, string> }
+): Promise<Response> => {
+  const maybeLoginToken = await getLoginToken();
+
+  let res: Response;
+  try {
+    res = await fetch(buildURL(path), {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { Authorization: maybeLoginToken, ...opts?.headers },
+    });
+  } catch (err) {
+    logError(`Network error during POST ${path}`, err);
+    throw err;
+  }
+
+  if (!res.ok) {
+    const responseText = await res.text().catch(() => '<failed to read response body>');
+    const err = new Error(`POST ${path} failed with status ${res.status}`);
+    getSentry()?.captureException(err, { extra: { path, status: res.status, responseText } });
+    throw err;
+  }
+
+  return res;
+};
+
 export const saveSynthVoicePreset = async (preset: {
   title: string;
   description: string;
   body: ReturnType<typeof serializeSynthModule>;
 }) => {
-  const maybeLoginToken = await getLoginToken();
-  return fetch(buildURL('/synth_voice_presets'), {
-    method: 'POST',
-    body: JSON.stringify(preset),
-    headers: {
-      Authorization: maybeLoginToken,
-    },
-  }).then(res => {
-    if (!res.ok) {
-      throw new Error(`Got bad status code ${res.status} when performing API request`);
-    }
-  });
+  await apiPost('/synth_voice_presets', preset);
 };
 
 export const saveSynthPreset = async (preset: {
@@ -37,18 +62,7 @@ export const saveSynthPreset = async (preset: {
     voices: ReturnType<typeof serializeSynthModule>[];
   };
 }) => {
-  const maybeLoginToken = await getLoginToken();
-  fetch(buildURL('/synth_presets'), {
-    method: 'POST',
-    body: JSON.stringify(preset),
-    headers: {
-      Authorization: maybeLoginToken,
-    },
-  }).then(res => {
-    if (!res.ok) {
-      throw new Error(`Got bad status code ${res.status} when performing API request`);
-    }
-  });
+  await apiPost('/synth_presets', preset);
 };
 
 const parseCompositionDefinition = (composition: CompositionDefinition): CompositionDefinition => {
@@ -257,21 +271,7 @@ export const saveLooperPreset = async (preset: {
   description: string;
   tags: string[];
   preset: SerializedLooperInstState;
-}) => {
-  const maybeLoginToken = await getLoginToken();
-  return fetch(`${BACKEND_BASE_URL}/looper_preset`, {
-    body: JSON.stringify(preset),
-    method: 'POST',
-    headers: {
-      Authorization: maybeLoginToken,
-    },
-  }).then(async res => {
-    if (!res.ok) {
-      throw await res.text();
-    }
-    return res.json();
-  });
-};
+}) => apiPost('/looper_preset', preset).then(res => res.json());
 
 export const getExistingLooperPresetTags = async (): Promise<{ name: string; count: number }[]> =>
   fetch(`${BACKEND_BASE_URL}/looper_preset_tags`).then(async res => {
@@ -296,21 +296,7 @@ export const saveSubgraphPreset = async (preset: {
   description: string;
   tags: string[];
   preset: SubgraphPreset;
-}) => {
-  const maybeLoginToken = await getLoginToken();
-  return fetch(`${BACKEND_BASE_URL}/subgraph_preset`, {
-    body: JSON.stringify(preset),
-    method: 'POST',
-    headers: {
-      Authorization: maybeLoginToken,
-    },
-  }).then(async res => {
-    if (!res.ok) {
-      throw await res.text();
-    }
-    return res.json();
-  });
-};
+}) => apiPost('/subgraph_preset', preset).then(res => res.json());
 
 export const fetchSubgraphPresets = async (): Promise<GenericPresetDescriptor[]> =>
   fetch(`${BACKEND_BASE_URL}/subgraph_presets`).then(async res => {
@@ -372,21 +358,8 @@ export const fetchWavetablePresets = async (): Promise<WavetablePresetDescriptor
     return res.json();
   });
 
-export const saveWavetablePreset = async (preset: SaveWaveformPresetRequest) => {
-  const maybeLoginToken = await getLoginToken();
-  return fetch(`${BACKEND_BASE_URL}/wavetable_preset`, {
-    body: JSON.stringify(preset),
-    method: 'POST',
-    headers: {
-      Authorization: maybeLoginToken,
-    },
-  }).then(async res => {
-    if (!res.ok) {
-      throw await res.text();
-    }
-    return res.json();
-  });
-};
+export const saveWavetablePreset = async (preset: SaveWaveformPresetRequest) =>
+  apiPost('/wavetable_preset', preset).then(res => res.json());
 
 export const getWavetablePreset = async (id: number): Promise<WavetablePreset> =>
   fetch(`${BACKEND_BASE_URL}/wavetable_preset/${id}`).then(async res => {
