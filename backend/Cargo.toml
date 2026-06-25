@@ -11,7 +11,9 @@ debug = true
 [dependencies]
 dotenv = "0.15.0"
 
-diesel = { version = "2.2", features = ["mysql", "chrono"] }
+# Keep >=2.3: 2.2.x mis-reads `is_null` for nullable integer columns when linked against
+# MariaDB Connector/C (the Docker deploy lib), yielding `TryFromSliceError` on NULL `user_id`.
+diesel = { version = "2.3", features = ["mysql", "chrono"] }
 
 hex = "0.4"
 
