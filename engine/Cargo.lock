@@ -249,6 +249,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9dfa3c0fd35278e839805680f4c2f673ca71eb91068115b4a611e71429bc0c46"
 
 [[package]]
+name = "filter_viz"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "dsp",
+]
+
+[[package]]
 name = "float-ord"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

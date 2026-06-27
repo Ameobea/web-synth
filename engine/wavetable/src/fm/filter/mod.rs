@@ -284,18 +284,17 @@ impl FilterModule {
   #[inline]
   pub fn reset(&mut self) { self.filter_state.reset(); }
 
-  pub fn apply_frame<const FILTER_PARAM_BUFFER_COUNT: usize>(
+  /// Renders the effective per-sample filter params into `rendered_q` / `rendered_cutoff_freq` /
+  /// `rendered_gain`.  Buffers for params the current mode doesn't use are zeroed so snapshots of
+  /// them stay meaningful.  Advances the filter envelope generator when the cutoff is driven by it,
+  /// so this must be called exactly once per processed frame.
+  pub fn render_params<const FILTER_PARAM_BUFFER_COUNT: usize>(
     &mut self,
     filter_envelope_generator: &mut ManagedAdsr,
-    frame: &mut [f32; FRAME_SIZE],
     filter_param_buffers: &[[f32; FRAME_SIZE]; FILTER_PARAM_BUFFER_COUNT],
     cur_bpm: f32,
     cur_frame_start_beat: f32,
   ) {
-    if self.is_bypassed {
-      return;
-    }
-
     match &self.cutoff_freq {
       ParamSource::Constant { .. } => (),
       ParamSource::ParamBuffer(_) => (),
@@ -317,23 +316,42 @@ impl FilterModule {
       .cutoff_freq
       .render_raw(&render_params, &mut self.rendered_cutoff_freq);
     let filter_mode = self.filter_state.get_filter_mode();
-    let gain = if filter_mode.map(|mode| mode.needs_gain()).unwrap_or(false) {
-      self
-        .gain
-        .render_raw(&render_params, &mut self.rendered_gain);
-      &self.rendered_gain
+    if filter_mode.map(|mode| mode.needs_gain()).unwrap_or(false) {
+      self.gain.render_raw(&render_params, &mut self.rendered_gain);
     } else {
-      &ZERO_FRAME
-    };
-    let q = if filter_mode.map(|mode| mode.needs_q()).unwrap_or(false) {
+      self.rendered_gain = ZERO_FRAME;
+    }
+    if filter_mode.map(|mode| mode.needs_q()).unwrap_or(false) {
       self.q.render_raw(&render_params, &mut self.rendered_q);
-      &self.rendered_q
     } else {
-      &ZERO_FRAME
-    };
+      self.rendered_q = ZERO_FRAME;
+    }
+  }
 
-    self
-      .filter_state
-      .apply_frame(q, &self.rendered_cutoff_freq, gain, frame);
+  pub fn apply_frame<const FILTER_PARAM_BUFFER_COUNT: usize>(
+    &mut self,
+    filter_envelope_generator: &mut ManagedAdsr,
+    frame: &mut [f32; FRAME_SIZE],
+    filter_param_buffers: &[[f32; FRAME_SIZE]; FILTER_PARAM_BUFFER_COUNT],
+    cur_bpm: f32,
+    cur_frame_start_beat: f32,
+  ) {
+    if self.is_bypassed {
+      return;
+    }
+
+    self.render_params(
+      filter_envelope_generator,
+      filter_param_buffers,
+      cur_bpm,
+      cur_frame_start_beat,
+    );
+
+    self.filter_state.apply_frame(
+      &self.rendered_q,
+      &self.rendered_cutoff_freq,
+      &self.rendered_gain,
+      frame,
+    );
   }
 }

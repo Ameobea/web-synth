@@ -33,7 +33,8 @@ members = [
   "sampler",
   "safety_limiter",
   "equalizer",
-  "lfo"
+  "lfo",
+  "filter_viz"
 ]
 
 [profile.release]

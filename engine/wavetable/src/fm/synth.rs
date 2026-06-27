@@ -1313,6 +1313,10 @@ pub struct FMSynthContext {
   pub last_master_gain: f32,
   pub frequency_multiplier: f32,
   pub most_recent_gated_voice_ix: usize,
+  /// When enabled, the most-recently-gated voice's effective filter params (`[q, cutoff, gain]`,
+  /// last sample of each frame) are snapshotted here each frame for the filter response viz.
+  pub filter_viz_enabled: bool,
+  pub filter_viz_snapshot: [f32; 3],
   pub adsr_phase_buf: [f32; 256],
   pub detune: Option<ParamSource>,
   pub wavetables: Vec<WaveTable>,
@@ -1423,6 +1427,42 @@ impl FMSynthContext {
         ));
       }
     }
+
+    if self.filter_viz_enabled {
+      self.snapshot_filter_viz(cur_bpm, cur_frame_start_beat);
+    }
+  }
+
+  /// Snapshots the most-recently-gated voice's effective filter params for the response viz.  When
+  /// that voice is idle (the audio path skips it, leaving its rendered params stale), the params are
+  /// re-rendered here for a single voice so the plot reflects the configured/at-rest filter.
+  fn snapshot_filter_viz(&mut self, cur_bpm: f32, cur_frame_start_beat: f32) {
+    let rep_ix = self.most_recent_gated_voice_ix;
+    let idle = unsafe {
+      *self
+        .base_frequency_input_buffer
+        .get_unchecked(rep_ix)
+        .get_unchecked(0)
+        == 0.
+    };
+    let voice = &mut self.voices[rep_ix];
+    if voice.filter_module.is_bypassed {
+      return;
+    }
+    if idle {
+      voice.filter_module.render_params(
+        &mut voice.filter_envelope_generator,
+        &self.filter_param_buffers,
+        cur_bpm,
+        cur_frame_start_beat,
+      );
+    }
+    let last = FRAME_SIZE - 1;
+    self.filter_viz_snapshot = [
+      voice.filter_module.rendered_q[last],
+      voice.filter_module.rendered_cutoff_freq[last],
+      voice.filter_module.rendered_gain[last],
+    ];
   }
 
   pub fn update_operator_enabled_statuses(&mut self) {
@@ -1481,6 +1521,8 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
     std::ptr::write(output_buffers_ptr, Box::new_uninit().assume_init());
     (*ctx.as_mut_ptr()).frequency_multiplier = 1.;
     (*ctx.as_mut_ptr()).most_recent_gated_voice_ix = 0;
+    (*ctx.as_mut_ptr()).filter_viz_enabled = false;
+    (*ctx.as_mut_ptr()).filter_viz_snapshot = [0.; 3];
     (*ctx.as_mut_ptr()).adsr_phase_buf = [0.; 256];
     (*ctx.as_mut_ptr()).detune = None;
     let wavetables_ptr = &mut (*ctx.as_mut_ptr()).wavetables;
@@ -2509,4 +2551,16 @@ pub extern "C" fn fm_synth_get_filter_param_buffers_ptr(
 ) -> *mut [f32; FRAME_SIZE] {
   let ctx = unsafe { &mut *ctx };
   ctx.filter_param_buffers.as_mut_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_set_filter_viz_enabled(ctx: *mut FMSynthContext, enabled: bool) {
+  let ctx = unsafe { &mut *ctx };
+  ctx.filter_viz_enabled = enabled;
+}
+
+#[no_mangle]
+pub extern "C" fn fm_synth_get_filter_viz_buf_ptr(ctx: *mut FMSynthContext) -> *const f32 {
+  let ctx = unsafe { &*ctx };
+  ctx.filter_viz_snapshot.as_ptr()
 }

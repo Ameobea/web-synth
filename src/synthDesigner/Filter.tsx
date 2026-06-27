@@ -8,8 +8,11 @@ import {
 } from 'src/controls/adsr2/ControlPanelADSR2';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
 import { AdsrLengthMode } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
+import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { getSynthDesignerReduxInfra, type FilterParams } from 'src/redux/modules/synthDesigner';
 import { getSettingsForFilterType } from 'src/synthDesigner/filterHelpers';
+import { FilterResponseVizComp } from 'src/synthDesigner/filterResponseViz/FilterResponseVizComp';
+import { encodeFilterType } from 'src/synthDesigner/FilterType';
 import { UnreachableError } from 'src/util';
 
 const style = { width: 600 };
@@ -143,6 +146,8 @@ interface FilterProps {
   stateKey: string;
   adsrLength: number;
   enableEnvelope: boolean;
+  fmSynth: FMSynth;
+  isHidden: boolean;
 }
 
 export const Filter: React.FC<FilterProps> = ({
@@ -153,6 +158,8 @@ export const Filter: React.FC<FilterProps> = ({
   stateKey,
   adsrLength,
   enableEnvelope,
+  fmSynth,
+  isHidden,
 }) => {
   const vcId = stateKey.split('_')[1];
   const settings = useMemo(
@@ -206,6 +213,13 @@ export const Filter: React.FC<FilterProps> = ({
         state={state}
         onChange={handleChange}
       />
+      {!bypass ? (
+        <FilterResponseVizComp
+          fmSynth={fmSynth}
+          filterTypeId={encodeFilterType(params.type)}
+          active={!isHidden}
+        />
+      ) : null}
       {enableEnvelope ? (
         <FilterEnvelopeControls
           stateKey={stateKey}

@@ -47,6 +47,15 @@ class FMSynthAWP extends AudioWorkletProcessor {
     this.wasmMemoryBuffer = null;
     this.sampleDataIxByHashedSampleDescriptor = new Map();
 
+    // Filter response viz: snapshot of the most-recently-gated voice's effective filter params,
+    // written to a `SharedArrayBuffer` each frame (only when changed) for an off-thread renderer.
+    this.filterVizSAB = null;
+    this.filterVizI32 = null;
+    this.filterVizF32 = null;
+    this.filterVizBufPtr = 0;
+    this.filterVizActive = false;
+    this.filterVizLast = [NaN, NaN, NaN];
+
     this.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'setWasmBytes': {
@@ -373,6 +382,38 @@ class FMSynthAWP extends AudioWorkletProcessor {
           this.wasmInstance.exports.fm_synth_set_filter_type(this.ctxPtr, evt.data.filterType);
           break;
         }
+        case 'enableFilterViz': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to enable filter viz before Wasm instance loaded');
+            return;
+          }
+          if (typeof SharedArrayBuffer === 'undefined') {
+            return;
+          }
+
+          if (!this.filterVizSAB) {
+            // layout: [i32 seq][f32 q][f32 cutoff][f32 gain]
+            this.filterVizSAB = new SharedArrayBuffer(4 * BYTES_PER_F32);
+            this.filterVizI32 = new Int32Array(this.filterVizSAB);
+            this.filterVizF32 = new Float32Array(this.filterVizSAB);
+          }
+          this.filterVizBufPtr = this.wasmInstance.exports.fm_synth_get_filter_viz_buf_ptr(
+            this.ctxPtr
+          );
+          this.port.postMessage({ type: 'filterVizSAB', sab: this.filterVizSAB });
+          break;
+        }
+        case 'setFilterVizActive': {
+          if (!this.wasmInstance) {
+            return;
+          }
+          this.filterVizActive = !!evt.data.active;
+          this.wasmInstance.exports.fm_synth_set_filter_viz_enabled(
+            this.ctxPtr,
+            this.filterVizActive
+          );
+          break;
+        }
         case 'setFilterQ': {
           if (!this.wasmInstance) {
             console.warn('Tried to set filter type before Wasm instance loaded');
@@ -695,6 +736,26 @@ class FMSynthAWP extends AudioWorkletProcessor {
         this.adsrPhasesBufPtr / BYTES_PER_F32 + ADSR_PHASE_BUF_LENGTH
       );
       this.audioThreadDataBuffer.set(adsrPhaseBuf);
+    }
+
+    // Publish the latest filter params to the viz renderer, but only when they've changed so the
+    // renderer stays fully asleep at rest.
+    if (this.filterVizActive && this.filterVizBufPtr) {
+      const base = this.filterVizBufPtr / BYTES_PER_F32;
+      const q = wasmMemory[base];
+      const cutoff = wasmMemory[base + 1];
+      const gain = wasmMemory[base + 2];
+      const last = this.filterVizLast;
+      if (q !== last[0] || cutoff !== last[1] || gain !== last[2]) {
+        last[0] = q;
+        last[1] = cutoff;
+        last[2] = gain;
+        this.filterVizF32[1] = q;
+        this.filterVizF32[2] = cutoff;
+        this.filterVizF32[3] = gain;
+        Atomics.add(this.filterVizI32, 0, 1);
+        Atomics.notify(this.filterVizI32, 0);
+      }
     }
 
     return true;

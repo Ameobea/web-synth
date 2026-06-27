@@ -42,7 +42,7 @@ import { AsyncOnce, normalizeEnvelope, UnimplementedError, UnreachableError } fr
 import { EventSchedulerInitialized } from 'src/eventScheduler';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
-import { FilterType } from 'src/synthDesigner/FilterType';
+import { encodeFilterType, FilterType } from 'src/synthDesigner/FilterType';
 
 const OPERATOR_COUNT = 8;
 
@@ -213,7 +213,10 @@ export default class FMSynth implements ForeignNode {
   private adsrs: AdsrParams[] = [buildDefaultAdsr()];
   public selectedUI: UISelection | null = null;
   private onInitializedCBs: ((inst: FMSynth) => void)[] = [];
+  private isInitialized = false;
   private audioThreadDataBuffer: Float32Array | null = null;
+  private filterVizSABPromise: Promise<SharedArrayBuffer | null> | null = null;
+  private resolveFilterVizSAB: ((sab: SharedArrayBuffer | null) => void) | null = null;
   private detune: ParamSource | null = null;
   private masterGain = 1;
   public midiControlValuesCache: MIDIControlValuesCache;
@@ -472,9 +475,15 @@ export default class FMSynth implements ForeignNode {
           this.setMasterGain(this.masterGain);
           this.sampleMappingStore.subscribe(this.handleSampleMappingStateChange);
 
+          this.isInitialized = true;
           for (const cb of this.onInitializedCBs) {
             cb(this);
           }
+          break;
+        }
+        case 'filterVizSAB': {
+          this.resolveFilterVizSAB?.(evt.data.sab as SharedArrayBuffer);
+          this.resolveFilterVizSAB = null;
           break;
         }
         case 'onGate': {
@@ -710,38 +719,41 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle?.port.postMessage({ type: 'setFilterBypassed', isBypassed });
   }
 
-  private encodeFilterType(filterType: FilterType): number {
-    return {
-      [FilterType.Lowpass]: 0,
-      [FilterType.LP4]: 1,
-      [FilterType.LP8]: 2,
-      [FilterType.LP16]: 3,
-      [FilterType.Highpass]: 4,
-      [FilterType.HP4]: 5,
-      [FilterType.HP8]: 6,
-      [FilterType.HP16]: 7,
-      [FilterType.Bandpass]: 8,
-      [FilterType.BP4]: 9,
-      [FilterType.BP8]: 10,
-      [FilterType.BP16]: 11,
-      [FilterType.DynaBP_50]: 12,
-      [FilterType.DynaBP_100]: 13,
-      [FilterType.DynaBP_200]: 14,
-      [FilterType.DynaBP_400]: 15,
-      [FilterType.DynaBP_800]: 16,
-      [FilterType.Lowshelf]: 17,
-      [FilterType.Highshelf]: 18,
-      [FilterType.Peaking]: 19,
-      [FilterType.Notch]: 20,
-      [FilterType.Allpass]: 21,
-    }[filterType];
+  /**
+   * Lazily enables the audio-thread filter param snapshot and resolves with the `SharedArrayBuffer`
+   * the filter response viz reads from.  No-op overhead until first called, so headless never enables
+   * it.  Resolves `null` if `SharedArrayBuffer` is unavailable.
+   */
+  public getFilterVizSAB(): Promise<SharedArrayBuffer | null> {
+    if (typeof SharedArrayBuffer === 'undefined') {
+      return Promise.resolve(null);
+    }
+    if (this.filterVizSABPromise) {
+      return this.filterVizSABPromise;
+    }
+
+    this.filterVizSABPromise = new Promise(resolve => {
+      this.resolveFilterVizSAB = resolve;
+    });
+    const enable = () => this.awpHandle?.port.postMessage({ type: 'enableFilterViz' });
+    if (this.isInitialized) {
+      enable();
+    } else {
+      this.onInitializedCBs.push(enable);
+    }
+    return this.filterVizSABPromise;
+  }
+
+  /** Enables/disables the audio-thread filter param snapshot for the response viz. */
+  public setFilterVizActive(active: boolean) {
+    this.awpHandle?.port.postMessage({ type: 'setFilterVizActive', active });
   }
 
   public handleFilterTypeChange(newFilterType: FilterType) {
     this.filterParams.type = newFilterType;
     this.awpHandle?.port.postMessage({
       type: 'setFilterType',
-      filterType: this.encodeFilterType(newFilterType),
+      filterType: encodeFilterType(newFilterType),
     });
   }
 

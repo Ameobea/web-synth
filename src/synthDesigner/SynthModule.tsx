@@ -315,6 +315,8 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
         bypass={synth.filterBypassed}
         adsrLength={synth.filterADSRLength}
         enableEnvelope={synth.filterEnvelopeEnabled ?? false}
+        fmSynth={synth.fmSynth}
+        isHidden={isHidden}
       />
 
       <div className='effects'>{children}</div>

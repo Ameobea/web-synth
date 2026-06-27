@@ -1,7 +1,7 @@
 set dotenv-load := true
 
 # .wasm modules copied raw into public/ and fetched at runtime
-wasm_modules := "wavetable granular event_scheduler sidechain noise_gen distortion adsr sample_editor delay sample_player looper midi_quantizer quantizer compressor vocoder level_detector wavegen multiband_diode_ladder_distortion midi_renderer oscilloscope spectrum_viz_full sampler safety_limiter equalizer lfo"
+wasm_modules := "wavetable granular event_scheduler sidechain noise_gen distortion adsr sample_editor delay sample_player looper midi_quantizer quantizer compressor vocoder level_detector wavegen multiband_diode_ladder_distortion midi_renderer oscilloscope spectrum_viz_full sampler safety_limiter equalizer lfo filter_viz"
 # modules run through wasm-bindgen; JS glue + _bg.wasm land in src/
 bindgen_modules := "engine midi spectrum_viz waveform_renderer wav_decoder"
 
@@ -215,6 +215,14 @@ build-equalizer:
 debug-equalizer:
   cd ./engine/equalizer && cargo build --target wasm32-unknown-unknown && \
     cp ../target/wasm32-unknown-unknown/debug/equalizer.wasm ../../public
+
+build-filter-viz:
+  cd ./engine/filter_viz && cargo build --release --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/release/filter_viz.wasm ../../public
+
+debug-filter-viz:
+  cd ./engine/filter_viz && cargo build --target wasm32-unknown-unknown && \
+    cp ../target/wasm32-unknown-unknown/debug/filter_viz.wasm ../../public
 
 build-lfo:
   cd ./engine/lfo && cargo build --release --target wasm32-unknown-unknown && \

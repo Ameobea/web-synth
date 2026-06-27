@@ -48,3 +48,4 @@ public/sampler.wasm
 public/safety_limiter.wasm
 public/equalizer.wasm
 public/lfo.wasm
+public/filter_viz.wasm
