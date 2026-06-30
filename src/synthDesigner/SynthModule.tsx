@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { Provider, shallowEqual, useSelector } from 'react-redux';
 
-import { saveSynthVoicePreset } from 'src/api';
+import { getSynthVoicePreset, saveSynthVoicePreset } from 'src/api';
 import {
   mkControlPanelADSR2WithSize,
   type ADSRWithOutputRange,
@@ -22,6 +22,7 @@ import {
 } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { renderModalWithControls } from 'src/controls/Modal';
 import { type SynthVoicePreset } from 'src/redux/modules/presets';
+import { logError } from 'src/sentry';
 import { VoicePresetFetchError } from 'src/synthDesigner/VoicePresetFetchError';
 
 const PRESETS_CONTROL_PANEL_STYLE = { height: 97, width: 400 };
@@ -42,10 +43,13 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
       typeof allVoicePresetsRaw === 'string'
         ? allVoicePresetsRaw
         : allVoicePresetsRaw.map(
-            (preset): PresetDescriptor<SynthVoicePreset> => ({
-              ...preset,
+            (preset): PresetDescriptor<number> => ({
+              id: preset.id,
               name: preset.title,
-              preset: preset.body,
+              description: preset.description,
+              preset: preset.id,
+              userID: preset.userId,
+              isFeatured: preset.isFeatured,
             })
           ),
     [allVoicePresetsRaw]
@@ -61,7 +65,7 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
         label: 'load preset',
         type: 'button',
         action: async () => {
-          let pickedPreset: PresetDescriptor<SynthVoicePreset>;
+          let pickedPreset: PresetDescriptor<number>;
           try {
             pickedPreset = await renderModalWithControls(
               mkGenericPresetPicker(() => allVoicePresets)
@@ -70,7 +74,15 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
             return; // cancelled
           }
 
-          dispatch(actionCreators.synthDesigner.SET_VOICE_STATE(index, pickedPreset.preset));
+          let body: SynthVoicePreset;
+          try {
+            body = await getSynthVoicePreset(pickedPreset.preset);
+          } catch (err) {
+            logError('Error fetching synth voice preset', err);
+            toastError(`Error fetching voice preset: ${err}`);
+            return;
+          }
+          dispatch(actionCreators.synthDesigner.SET_VOICE_STATE(index, body));
         },
       },
       {

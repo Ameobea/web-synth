@@ -7,7 +7,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 
 import './MIDIEditor.css';
 
-import { getExistingMIDICompositionTags, saveMIDIComposition } from 'src/api';
+import { getExistingMIDICompositionTags, getMIDIComposition, saveMIDIComposition } from 'src/api';
 import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImportDialog';
@@ -500,9 +500,12 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
           }
 
           try {
-            const {
-              preset: { composition },
-            } = await mkLoadMIDICompositionModal();
+            const { preset } = await mkLoadMIDICompositionModal();
+            const composition = await getMIDIComposition(preset.id);
+            if (!composition) {
+              toastError('MIDI composition not found');
+              return;
+            }
 
             activeInstance.current.reInitialize(composition);
           } catch (_err) {

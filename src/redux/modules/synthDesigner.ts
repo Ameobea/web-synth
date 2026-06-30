@@ -12,7 +12,7 @@ import FMSynth, {
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import type { MIDINode } from 'src/patchNetwork/midiNode';
-import type { SynthPresetEntry, SynthVoicePreset } from 'src/redux/modules/presets';
+import type { SynthVoicePreset } from 'src/redux/modules/presets';
 import { get_synth_designer_audio_connectables } from 'src/synthDesigner';
 import { FilterType } from 'src/synthDesigner/FilterType';
 import type { FilterCSNs } from 'src/synthDesigner/biquadFilterModule';
@@ -641,7 +641,7 @@ const actionGroups = {
     },
   }),
   SET_SYNTH_PRESET: buildActionGroup({
-    actionCreator: (preset: SynthPresetEntry) => ({ type: 'SET_SYNTH_PRESET', preset }),
+    actionCreator: (preset: { voices: SynthVoicePreset[] }) => ({ type: 'SET_SYNTH_PRESET', preset }),
     subReducer: (state: SynthDesignerState, { preset }) => {
       if (state.synths.length !== 0) {
         throw new Error(
@@ -650,7 +650,7 @@ const actionGroups = {
       }
 
       const stateKey = `synthDesigner_${state.vcId}`;
-      const synths = preset.body.voices.map((def, i) =>
+      const synths = preset.voices.map((def, i) =>
         deserializeSynthModule(state.wavyJonesInstance, def, stateKey, i)
       );
       for (const synth of state.synths) {

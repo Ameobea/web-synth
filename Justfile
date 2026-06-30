@@ -42,6 +42,10 @@ build-all: build-wasm
   just opt
   just build-docs
 
+build-and-deploy:
+  just build-all
+  just deploy
+
 build-headless:
   yarn build-headless
 

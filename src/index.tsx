@@ -9,6 +9,7 @@ import {
   onBeforeUnload,
 } from 'src/persistance';
 import { getReactQueryClient } from 'src/reactProviders';
+import { prefetchSynthPresets } from 'src/redux/modules/presets';
 import { initializeDefaultVCMState } from 'src/redux/modules/vcmUtils';
 import { getSentry, initSentry } from 'src/sentry';
 import { installSpy } from 'src/spy';
@@ -23,6 +24,10 @@ import './colors.css';
 import { createSafariNotification } from 'src/misc/SafariNotification';
 
 initGlobals();
+
+// Populate the synth designer preset descriptor lists.  Only reached in the non-headless build, so
+// it never fires the preset requests in headless mode.
+prefetchSynthPresets();
 
 const wasm = import('./engine').then(async engine => {
   await engine.default();

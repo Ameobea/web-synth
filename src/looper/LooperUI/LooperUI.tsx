@@ -8,8 +8,10 @@ import {
   fetchLooperPresets,
   getExistingLooperPresetTags,
   getLooperPreset,
+  getMIDIComposition,
   saveLooperPreset,
   type GenericPresetDescriptor,
+  type SavedMIDIComposition,
 } from 'src/api';
 import {
   pickPresetWithModal,
@@ -129,7 +131,13 @@ const LooperBankCompInner: React.FC<LooperBankCompProps> = ({
         label: 'select midi sequence',
         action: async () => {
           try {
-            const { preset: composition } = await mkLoadMIDICompositionModal();
+            const { preset: descriptor } = await mkLoadMIDICompositionModal();
+            const compositionBody = await getMIDIComposition(descriptor.id);
+            if (!compositionBody) {
+              toastError('MIDI composition not found');
+              return;
+            }
+            const composition: SavedMIDIComposition = { ...descriptor, composition: compositionBody };
             looperDispatch(
               looperActions.setLoadedComposition({ vcId, moduleIx, bankIx, composition })
             );
@@ -271,7 +279,7 @@ const loadLooperPreset = (vcId: string, preset: SerializedLooperInstState) => {
   const oldState = getState().looper.stateByVcId[vcId];
 
   // Tear down existing state, deleting all banks and all modules
-  oldState.modules.forEach((mod, moduleIx) => {
+  oldState.modules.forEach((_mod, moduleIx) => {
     looperDispatch(looperActions.removeModule({ vcId, moduleIx }));
   });
 
@@ -382,7 +390,7 @@ const LooperTabSwitcher: React.FC<LooperTabSwitcherProps> = ({ vcId }) => {
                 preset: deserializeLooper(serializeLooper(getState().looper.stateByVcId[vcId])),
               });
               console.log('Successfully created preset with id: ', id);
-            } catch (err) {
+            } catch (_err) {
               // pass
             }
           }}

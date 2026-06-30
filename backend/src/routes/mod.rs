@@ -12,10 +12,10 @@ use crate::{
       Composition, CompositionDescriptor, CompositionVersion, NewComposition,
       NewCompositionRequest, NewCompositionTag,
     },
-    effects::{Effect, InsertableEffect},
+    effects::{Effect, EffectDescriptor, InsertableEffect},
     synth_preset::{
-      InlineSynthPreset, InlineSynthPresetEntry, NewSynthPresetEntry, NewSynthVoicePresetEntry,
-      ReceivedSynthPresetEntry, SynthPreset, SynthVoicePresetEntry,
+      InlineSynthPreset, NewSynthPresetEntry, NewSynthVoicePresetEntry, ReceivedSynthPresetEntry,
+      SynthPreset, SynthPresetDescriptor, SynthVoicePresetDescriptor,
       UserProvidedNewSynthVoicePreset, VoiceDefinition,
     },
     tags::{EntityIdTag, TagCount},
@@ -75,7 +75,7 @@ pub async fn create_effect(
 }
 
 #[get("/effects")]
-pub async fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<Effect>>, String> {
+pub async fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<EffectDescriptor>>, String> {
   use crate::schema::{effects, users};
 
   let all_effects = conn
@@ -86,12 +86,11 @@ pub async fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<Effect>>, Str
           effects::id,
           effects::title,
           effects::description,
-          effects::code,
           effects::user_id,
           users::username.nullable(),
           effects::is_featured,
         ))
-        .load(conn)
+        .load::<EffectDescriptor>(conn)
     })
     .await
     .map_err(|err| {
@@ -99,6 +98,38 @@ pub async fn list_effects(conn: WebSynthDbConn) -> Result<Json<Vec<Effect>>, Str
       "Error querying effects from the database".to_string()
     })?;
   Ok(Json(all_effects))
+}
+
+#[get("/effect/<effect_id>")]
+pub async fn get_effect_by_id(
+  conn: WebSynthDbConn,
+  effect_id: i64,
+) -> Result<Option<Json<Effect>>, String> {
+  use crate::schema::{effects, users};
+
+  let effect = conn
+    .run(move |conn| {
+      effects::table
+        .left_join(users::table)
+        .filter(effects::id.eq(effect_id))
+        .select((
+          effects::id,
+          effects::title,
+          effects::description,
+          effects::code,
+          effects::user_id,
+          users::username.nullable(),
+          effects::is_featured,
+        ))
+        .first::<Effect>(conn)
+        .optional()
+    })
+    .await
+    .map_err(|err| {
+      error!("Error querying effect: {:?}", err);
+      "Error querying effect from the database".to_string()
+    })?;
+  Ok(effect.map(Json))
 }
 
 #[post("/compositions", data = "<composition>")]
@@ -382,94 +413,63 @@ pub async fn get_composition_tags(conn: WebSynthDbConn) -> Result<Json<Vec<TagCo
 
 #[get("/synth_presets")]
 pub async fn get_synth_presets(
-  conn0: WebSynthDbConn,
-  conn1: WebSynthDbConn,
-) -> Result<Json<Vec<InlineSynthPresetEntry>>, String> {
-  use crate::schema::{synth_presets, voice_presets};
+  conn: WebSynthDbConn,
+) -> Result<Json<Vec<SynthPresetDescriptor>>, String> {
+  use crate::schema::synth_presets;
 
-  let (synth_presets_, voice_presets_): (
-    Vec<(i64, String, String, String, Option<i64>, bool)>,
-    Vec<(i64, String, String, String, Option<i64>, bool)>,
-  ) = tokio::try_join!(
-    conn0.run(|conn| {
+  let descriptors = conn
+    .run(|conn| {
       synth_presets::table
         .select((
           synth_presets::id,
           synth_presets::title,
           synth_presets::description,
-          synth_presets::body,
           synth_presets::user_id,
           synth_presets::is_featured,
         ))
-        .load(conn)
-        .map_err(|err| {
-          error!("Error querying synth presets: {:?}", err);
-          "Error querying synth presets from the database".to_string()
-        })
-    }),
-    conn1.run(|conn| {
-      voice_presets::table
-        .select((
-          voice_presets::id,
-          voice_presets::title,
-          voice_presets::description,
-          voice_presets::body,
-          voice_presets::user_id,
-          voice_presets::is_featured,
-        ))
-        .load(conn)
-        .map_err(|err| {
-          error!("Error querying synth voice presets: {:?}", err);
-          "Error querying synth voice presets from the database".to_string()
-        })
-    }),
-  )?;
-
-  // build a mapping of voice preset id to voice preset
-  let mut voice_presets_by_id: FxHashMap<i64, SynthVoicePresetEntry> = FxHashMap::default();
-  for (id_, title_, description_, body_, user_id_, is_featured) in voice_presets_ {
-    let body_ = serde_json::from_str(&body_).map_err(|err| -> String {
-      error!("Error parsing voice preset entry stored in DB: {:?}", err);
-      "Error parsing voice preset entry stored in DB".into()
+        .load::<SynthPresetDescriptor>(conn)
+    })
+    .await
+    .map_err(|err| {
+      error!("Error querying synth presets: {:?}", err);
+      "Error querying synth presets from the database".to_string()
     })?;
 
-    let voice_preset = SynthVoicePresetEntry {
-      id: id_,
-      title: title_,
-      description: description_,
-      body: body_,
-      user_id: user_id_,
-      is_featured,
-    };
+  Ok(Json(descriptors))
+}
 
-    voice_presets_by_id.insert(voice_preset.id, voice_preset);
-  }
+#[get("/synth_preset/<preset_id>")]
+pub async fn get_synth_preset_by_id(
+  conn: WebSynthDbConn,
+  preset_id: i64,
+) -> Result<Option<Json<InlineSynthPreset>>, String> {
+  use crate::schema::synth_presets;
 
-  let presets = synth_presets_
-        .into_iter()
-        .map(
-            |(synth_preset_id, title_, description_, body_, user_id_, is_featured)| -> Result<InlineSynthPresetEntry, String> {
-                let body_: SynthPreset =
-                    serde_json::from_str(&body_).map_err(|err| -> String {
-                        error!("Invalid synth preset body provided: {:?}", err);
-                        "Invalid synth preset body provided".into()
-                    })?;
-                let inlined_body = InlineSynthPreset {
-                    voices: body_.voices,
-                };
-                Ok(InlineSynthPresetEntry {
-                    id: synth_preset_id,
-                    title: title_,
-                    description: description_,
-                    body: inlined_body,
-                    user_id: user_id_,
-                    is_featured
-                })
-            },
-        )
-        .collect::<Result<Vec<_>, String>>()?;
+  let body: Option<String> = conn
+    .run(move |conn| {
+      synth_presets::table
+        .find(preset_id)
+        .select(synth_presets::body)
+        .first(conn)
+        .optional()
+    })
+    .await
+    .map_err(|err| {
+      error!("Error querying synth preset: {:?}", err);
+      "Error querying synth preset from the database".to_string()
+    })?;
 
-  Ok(Json(presets))
+  let body = match body {
+    Some(body) => body,
+    None => return Ok(None),
+  };
+  let parsed: SynthPreset = serde_json::from_str(&body).map_err(|err| {
+    error!("Invalid synth preset body in DB: {:?}", err);
+    String::from("Invalid synth preset body in DB")
+  })?;
+  Ok(Some(Json(InlineSynthPreset {
+    voices: parsed.voices,
+  })))
 }
 
 #[post("/synth_presets", data = "<preset>")]
@@ -516,55 +516,60 @@ pub async fn create_synth_preset(
 #[get("/synth_voice_presets")]
 pub async fn get_synth_voice_presets(
   conn: WebSynthDbConn,
-) -> Result<Json<Vec<SynthVoicePresetEntry>>, String> {
+) -> Result<Json<Vec<SynthVoicePresetDescriptor>>, String> {
   use crate::schema::voice_presets;
 
-  let all_presets = conn
+  let descriptors = conn
     .run(|conn| {
       voice_presets::table
         .select((
           voice_presets::dsl::id,
           voice_presets::dsl::title,
           voice_presets::dsl::description,
-          voice_presets::dsl::body,
           voice_presets::dsl::user_id,
           voice_presets::dsl::is_featured,
         ))
-        .load(conn)
+        .load::<SynthVoicePresetDescriptor>(conn)
     })
     .await
     .map_err(|err| {
-      error!("Error querying synth presets: {:?}", err);
-      "Error querying synth presets from the database".to_string()
+      error!("Error querying synth voice presets: {:?}", err);
+      "Error querying synth voice presets from the database".to_string()
     })?;
-  let all_presets: Vec<SynthVoicePresetEntry> = all_presets
-    .into_iter()
-    .map(
-      |(id, title, description, body, user_id, is_featured): (
-        i64,
-        String,
-        String,
-        String,
-        Option<i64>,
-        bool,
-      )| {
-        let preset: VoiceDefinition = serde_json::from_str(&body).map_err(|err| -> String {
-          let err_msg = format!("Error parsing provided synth definition: {:?}", err);
-          error!("{}", err_msg);
-          err_msg
-        })?;
-        Ok(SynthVoicePresetEntry {
-          id,
-          title,
-          description,
-          body: preset,
-          user_id,
-          is_featured,
-        })
-      },
-    )
-    .collect::<Result<Vec<_>, String>>()?;
-  Ok(Json(all_presets))
+
+  Ok(Json(descriptors))
+}
+
+#[get("/synth_voice_preset/<preset_id>")]
+pub async fn get_synth_voice_preset_by_id(
+  conn: WebSynthDbConn,
+  preset_id: i64,
+) -> Result<Option<Json<VoiceDefinition>>, String> {
+  use crate::schema::voice_presets;
+
+  let body: Option<String> = conn
+    .run(move |conn| {
+      voice_presets::table
+        .find(preset_id)
+        .select(voice_presets::dsl::body)
+        .first(conn)
+        .optional()
+    })
+    .await
+    .map_err(|err| {
+      error!("Error querying synth voice preset: {:?}", err);
+      "Error querying synth voice preset from the database".to_string()
+    })?;
+
+  let body = match body {
+    Some(body) => body,
+    None => return Ok(None),
+  };
+  let preset: VoiceDefinition = serde_json::from_str(&body).map_err(|err| {
+    error!("Error parsing voice preset body in DB: {:?}", err);
+    String::from("Error parsing voice preset body in DB")
+  })?;
+  Ok(Some(Json(preset)))
 }
 
 #[post("/synth_voice_presets", data = "<voice_preset>")]

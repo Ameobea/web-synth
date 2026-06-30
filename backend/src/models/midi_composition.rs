@@ -45,13 +45,13 @@ pub struct InsertableMIDIComposition {
   pub composition_json: String,
 }
 
-#[derive(Serialize, Queryable)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct QueryableMIDIComposition {
+pub struct MIDICompositionDescriptor {
   pub id: i64,
   pub name: String,
   pub description: String,
-  pub composition_json: String,
+  pub tags: Vec<String>,
   pub user_id: Option<i64>,
   pub created_at: Option<NaiveDateTime>,
   pub is_featured: bool,

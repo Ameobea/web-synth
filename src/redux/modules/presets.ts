@@ -6,31 +6,38 @@ import { actionCreators, dispatch } from 'src/redux';
 import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import { retryAsync } from 'src/util';
 
-export interface SynthPresetEntry {
-  id: number;
-  title: string;
-  description: string;
-  body: { voices: SynthVoicePreset[] };
-  userId: number | null | undefined;
-}
-
 export type SynthVoicePreset = ReturnType<typeof serializeSynthModule> & {
   gainEnvelope?: ADSRValues;
   gainADSRLength?: number;
 };
 
-export interface SynthVoicePresetEntry {
+/**
+ * Metadata-only descriptor returned by the `synth_presets` listing endpoint.  The actual preset
+ * body (`{ voices }`) is fetched lazily by id via `getSynthPreset` when a preset is selected.
+ */
+export interface SynthPresetDescriptor {
   id: number;
   title: string;
   description: string;
-  body: SynthVoicePreset;
+  userId: number | null | undefined;
+  isFeatured?: boolean;
+}
+
+/**
+ * Metadata-only descriptor returned by the `synth_voice_presets` listing endpoint.  The voice body
+ * is fetched lazily by id via `getSynthVoicePreset` when a preset is selected.
+ */
+export interface SynthVoicePresetDescriptor {
+  id: number;
+  title: string;
+  description: string;
   userId: number | null | undefined;
   isFeatured?: boolean;
 }
 
 export type PresetsState = {
-  synthPresets: 'NOT_FETCHED' | 'FETCHING' | 'FETCH_ERROR' | SynthPresetEntry[];
-  voicePresets: 'NOT_FETCHED' | 'FETCHING' | 'FETCH_ERROR' | SynthVoicePresetEntry[];
+  synthPresets: 'NOT_FETCHED' | 'FETCHING' | 'FETCH_ERROR' | SynthPresetDescriptor[];
+  voicePresets: 'NOT_FETCHED' | 'FETCHING' | 'FETCH_ERROR' | SynthVoicePresetDescriptor[];
 };
 
 const buildInitialState = (): PresetsState => ({
@@ -75,7 +82,7 @@ export const fetchSynthPresets = async () => {
 export const fetchSynthVoicePresets = async () => {
   dispatch(actionCreators.presets.SET_SYNTH_VOICE_PRESETS('FETCHING'));
   try {
-    const presets: SynthVoicePresetEntry[] = await retryAsync(
+    const presets: SynthVoicePresetDescriptor[] = await retryAsync(
       () => fetch(`${BACKEND_BASE_URL}/synth_voice_presets`).then(res => res.json()),
       3
     );
@@ -84,4 +91,15 @@ export const fetchSynthVoicePresets = async () => {
     console.error(`Error fetching synth voice presets: ${err}`);
     dispatch(actionCreators.presets.SET_SYNTH_VOICE_PRESETS('FETCH_ERROR'));
   }
+};
+
+/**
+ * Eagerly populates the synth + voice preset *descriptor* lists used by the synth designer's preset
+ * pickers.  Called explicitly from the non-headless entry point rather than as a module side effect
+ * so it never races the `window.isHeadless` flag (which isn't yet set when this module is first
+ * evaluated in the headless bundle).
+ */
+export const prefetchSynthPresets = () => {
+  fetchSynthPresets();
+  fetchSynthVoicePresets();
 };

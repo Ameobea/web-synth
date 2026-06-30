@@ -3,7 +3,7 @@ import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } fr
 import ControlPanel from 'react-control-panel';
 import { shallowEqual, useSelector } from 'react-redux';
 
-import { fetchEffects, saveEffect } from 'src/api';
+import { fetchEffects, getEffect, saveEffect } from 'src/api';
 import { pickPresetWithModal } from 'src/controls/GenericPresetPicker/GenericPresetPicker';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { faustEditorContextMap, type FaustEditorReduxInfra } from 'src/faustEditor';
@@ -15,7 +15,7 @@ import {
 } from 'src/faustEditor/compileHandlers';
 import { useWindowSize } from 'src/reactUtils';
 import type { Effect } from 'src/redux/modules/effects';
-import { getSentry } from 'src/sentry';
+import { getSentry, logError } from 'src/sentry';
 import { filterNils } from 'src/util';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
@@ -24,7 +24,6 @@ export type FaustEditorReduxStore = ReturnType<
 >;
 
 const CodeEditor = React.lazy(() => import('./CodeEditor'));
-
 
 const styles: { [key: string]: React.CSSProperties } = {
   root: {
@@ -54,7 +53,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     marginBottom: -23,
   },
 };
-
 
 interface BuildCodeEditorControlPanelSettingsArgs {
   isRunning: boolean;
@@ -108,24 +106,30 @@ const buildCodeEditorControlPanelSettings = ({
       type: 'button',
       label: 'load program',
       action: async () => {
+        let effectId: number;
         try {
-          const { preset: effect } = await pickPresetWithModal(async () => {
+          ({ preset: effectId } = await pickPresetWithModal(async () => {
             const effects = await fetchEffects();
             return effects.map(effect => ({
               id: effect.id,
               name: effect.title,
               description: effect.description,
-              preset: effect,
+              preset: effect.id,
               userID: effect.userId,
               userName: effect.userName,
               isFeatured: effect.isFeatured,
             }));
-          });
-          reduxInfra.dispatch(
-            reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code)
-          );
+          }));
         } catch (_err) {
-          // pass
+          return; // cancelled
+        }
+
+        try {
+          const effect = await getEffect(effectId);
+          reduxInfra.dispatch(reduxInfra.actionCreators.faustEditor.SET_EDITOR_CONTENT(effect.code));
+        } catch (err) {
+          logError('Error fetching effect', err);
+          toastError(`Error fetching effect: ${err}`);
         }
       },
     },

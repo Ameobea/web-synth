@@ -3,15 +3,12 @@ import ControlPanel from 'react-control-panel';
 import { Provider, shallowEqual, useDispatch, useSelector } from 'react-redux';
 
 import './SynthDesigner.css';
-import { saveSynthPreset } from 'src/api';
+import { getSynthPreset, getSynthVoicePreset, saveSynthPreset } from 'src/api';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { store, type ReduxStore } from 'src/redux';
-import {
-  fetchSynthPresets,
-  type SynthPresetEntry,
-  type SynthVoicePresetEntry,
-} from 'src/redux/modules/presets';
+import { fetchSynthPresets, type SynthVoicePreset } from 'src/redux/modules/presets';
+import { logError } from 'src/sentry';
 import { actionCreators } from 'src/redux';
 import { getSynthDesignerReduxInfra, serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import {
@@ -67,21 +64,37 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
             return;
           }
 
-          let pickedPreset: PresetDescriptor<SynthVoicePresetEntry>;
+          let pickedPreset: PresetDescriptor<number>;
           try {
             pickedPreset = await renderModalWithControls(
               mkGenericPresetPicker(() =>
-                voicePresets.map(preset => ({ ...preset, preset, name: preset.title }))
+                voicePresets.map(preset => ({
+                  id: preset.id,
+                  name: preset.title,
+                  description: preset.description,
+                  preset: preset.id,
+                  userID: preset.userId,
+                  isFeatured: preset.isFeatured,
+                }))
               )
             );
           } catch (_err) {
             return; // cancelled
           }
 
+          let body: SynthVoicePreset;
+          try {
+            body = await getSynthVoicePreset(pickedPreset.preset);
+          } catch (err) {
+            logError('Error fetching synth voice preset', err);
+            toastError(`Error fetching voice preset: ${err}`);
+            return;
+          }
+
           const vcId = stateKey.split('_')[1]!;
           synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
           synthDesignerDispatch(
-            synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(-1, pickedPreset.preset.body)
+            synthDesignerActionCreators.synthDesigner.SET_VOICE_STATE(-1, body)
           );
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
           updateConnectables(vcId, newConnectables);
@@ -128,15 +141,31 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
             return;
           }
 
-          let pickedPreset: PresetDescriptor<SynthPresetEntry>;
+          let pickedPreset: PresetDescriptor<number>;
           try {
             pickedPreset = await renderModalWithControls(
               mkGenericPresetPicker(() =>
-                synthPresets.map(preset => ({ ...preset, preset, name: preset.title }))
+                synthPresets.map(preset => ({
+                  id: preset.id,
+                  name: preset.title,
+                  description: preset.description,
+                  preset: preset.id,
+                  userID: preset.userId,
+                  isFeatured: preset.isFeatured,
+                }))
               )
             );
           } catch (_err) {
             return; // cancelled
+          }
+
+          let body: { voices: SynthVoicePreset[] };
+          try {
+            body = await getSynthPreset(pickedPreset.preset);
+          } catch (err) {
+            logError('Error fetching synth preset', err);
+            toastError(`Error fetching synth preset: ${err}`);
+            return;
           }
 
           const synths = getState().synthDesigner.synths;
@@ -153,7 +182,7 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
             }
           }
 
-          dispatch(synthDesignerActionCreators.SET_SYNTH_PRESET(pickedPreset.preset));
+          dispatch(synthDesignerActionCreators.SET_SYNTH_PRESET(body));
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
           const vcId = stateKey.split('_')[1]!;
           updateConnectables(vcId, newConnectables);

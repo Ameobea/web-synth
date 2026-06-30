@@ -4,6 +4,7 @@ import type { BuildWavetableInstanceState } from 'src/fmSynth/Wavetable/BuildWav
 import type { SerializedMIDIEditorInstance } from 'src/midiEditor';
 import { getLoginToken } from 'src/persistance';
 import type { Effect } from 'src/redux/modules/effects';
+import type { SynthVoicePreset } from 'src/redux/modules/presets';
 import type { SerializedLooperInstState } from 'src/redux/modules/looper';
 import type { serializeSynthModule } from 'src/redux/modules/synthDesigner';
 import type { SampleDescriptor } from 'src/sampleLibrary';
@@ -64,6 +65,22 @@ export const saveSynthPreset = async (preset: {
 }) => {
   await apiPost('/synth_presets', preset);
 };
+
+export const getSynthVoicePreset = async (id: number): Promise<SynthVoicePreset> =>
+  fetch(`${BACKEND_BASE_URL}/synth_voice_preset/${id}`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const getSynthPreset = async (id: number): Promise<{ voices: SynthVoicePreset[] }> =>
+  fetch(`${BACKEND_BASE_URL}/synth_preset/${id}`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
 
 const parseCompositionDefinition = (composition: CompositionDefinition): CompositionDefinition => {
   if (typeof composition.createdAt === 'string') {
@@ -172,8 +189,18 @@ export const listRemoteSamples = async (): Promise<RemoteSample[]> =>
     }
   );
 
-export const fetchEffects = (): Promise<Effect[]> =>
+export type EffectDescriptor = Omit<Effect, 'code'>;
+
+export const fetchEffects = (): Promise<EffectDescriptor[]> =>
   fetch(`${BACKEND_BASE_URL}/effects`).then(async res => {
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
+
+export const getEffect = async (id: number): Promise<Effect> =>
+  fetch(`${BACKEND_BASE_URL}/effect/${id}`).then(async res => {
     if (!res.ok) {
       throw await res.text();
     }
@@ -195,11 +222,10 @@ export const saveEffect = async (effect: Omit<Effect, 'id'>) => {
   });
 };
 
-export interface SavedMIDIComposition {
+export interface SavedMIDICompositionDescriptor {
   id: number;
   name: string;
   description: string;
-  composition: SerializedMIDIEditorInstance;
   tags: string[];
   userId: number | null | undefined;
   userName: string | null | undefined;
@@ -207,17 +233,40 @@ export interface SavedMIDIComposition {
   isFeatured?: boolean;
 }
 
-const parseSavedMIDIComposition = (composition: SavedMIDIComposition): SavedMIDIComposition => {
+/**
+ * A descriptor along with its fetched composition body.  The looper persists this full object inline
+ * in its own serialized state, so it needs both the metadata and the composition notes.
+ */
+export interface SavedMIDIComposition extends SavedMIDICompositionDescriptor {
+  composition: SerializedMIDIEditorInstance;
+}
+
+const parseSavedMIDIComposition = (
+  composition: SavedMIDICompositionDescriptor
+): SavedMIDICompositionDescriptor => {
   if (typeof composition.createdAt === 'string') {
     composition.createdAt = new Date(`${composition.createdAt}Z`);
   }
   return composition;
 };
 
-export const getSavedMIDICompositions = async (): Promise<SavedMIDIComposition[]> =>
+export const getSavedMIDICompositions = async (): Promise<SavedMIDICompositionDescriptor[]> =>
   fetch(`${BACKEND_BASE_URL}/midi_compositions`).then(async res =>
-    ((await res.json()) as SavedMIDIComposition[]).map(parseSavedMIDIComposition)
+    ((await res.json()) as SavedMIDICompositionDescriptor[]).map(parseSavedMIDIComposition)
   );
+
+export const getMIDIComposition = async (
+  id: number
+): Promise<SerializedMIDIEditorInstance | null> =>
+  fetch(`${BACKEND_BASE_URL}/midi_composition/${id}`).then(async res => {
+    if (res.status === 404) {
+      return null;
+    }
+    if (!res.ok) {
+      throw await res.text();
+    }
+    return res.json();
+  });
 
 export const saveMIDIComposition = async (
   name: string,

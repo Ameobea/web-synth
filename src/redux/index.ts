@@ -7,10 +7,7 @@ import genericPresetPickerSlice, {
 } from 'src/redux/modules/genericPresetPicker';
 import looperSlice, { type looperActions, type LooperState } from 'src/redux/modules/looper';
 import midiKeyboardModule from 'src/redux/modules/midiKeyboard';
-import presetsModule, {
-  fetchSynthPresets,
-  fetchSynthVoicePresets,
-} from 'src/redux/modules/presets';
+import presetsModule from 'src/redux/modules/presets';
 import viewContextManagerModule from 'src/redux/modules/viewContextManager';
 import type { ValueOf } from 'src/util';
 
@@ -45,11 +42,5 @@ export const looperDispatch = (action: ReturnType<ValueOf<typeof looperActions>>
 export const genericPresetDispatch = (
   action: ReturnType<ValueOf<typeof genericPresetPickerActions>>
 ) => dispatch(action as any);
-
-// Don't mind my side effects; they're harmless I promise
-if (!(window as any).isHeadless) {
-  fetchSynthPresets();
-  fetchSynthVoicePresets();
-}
 
 (window as any).getState = getState;

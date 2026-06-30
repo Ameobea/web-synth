@@ -16,6 +16,17 @@ pub struct Effect {
   pub is_featured: bool,
 }
 
+#[derive(Serialize, Queryable)]
+#[serde(rename_all = "camelCase")]
+pub struct EffectDescriptor {
+  pub id: i64,
+  pub title: String,
+  pub description: String,
+  pub user_id: Option<i64>,
+  pub user_name: Option<String>,
+  pub is_featured: bool,
+}
+
 #[derive(Deserialize, Insertable)]
 #[diesel(table_name = effects)]
 pub struct InsertableEffect {

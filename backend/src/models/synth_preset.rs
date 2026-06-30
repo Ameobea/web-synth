@@ -250,12 +250,12 @@ pub struct SynthPresetEntry {
   pub is_featured: bool,
 }
 
-#[derive(Serialize)]
-pub struct InlineSynthPresetEntry {
+#[derive(Serialize, Queryable)]
+#[serde(rename_all = "camelCase")]
+pub struct SynthPresetDescriptor {
   pub id: i64,
   pub title: String,
   pub description: String,
-  pub body: InlineSynthPreset,
   pub user_id: Option<i64>,
   pub is_featured: bool,
 }
@@ -276,15 +276,13 @@ pub struct NewSynthPresetEntry {
   pub user_id: Option<i64>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Queryable)]
 #[serde(rename_all = "camelCase")]
-pub struct SynthVoicePresetEntry {
+pub struct SynthVoicePresetDescriptor {
   pub id: i64,
   pub title: String,
   pub description: String,
-  pub body: VoiceDefinition,
   pub user_id: Option<i64>,
-  #[serde(default)]
   pub is_featured: bool,
 }
 

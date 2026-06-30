@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use itertools::Itertools;
 use rocket::serde::json::Json;
@@ -14,85 +15,103 @@ use crate::{
 #[get("/midi_compositions")]
 pub async fn get_midi_compositions(
   conn: WebSynthDbConn,
-) -> Result<Json<Vec<MIDIComposition>>, String> {
+) -> Result<Json<Vec<MIDICompositionDescriptor>>, String> {
   use crate::schema::{midi_compositions, midi_compositions_tags, tags};
 
-  let compositions: Vec<QueryableMIDIComposition> = conn
-    .run(|conn| {
-      midi_compositions::table
-        .select(midi_compositions::all_columns)
-        .load(conn)
-        .map_err(|err| {
-          error!("Error querying MIDI compositions from DB: {:?}", err);
-          String::from("DB Error")
-        })
-    })
-    .await?;
-  let compositions = compositions
-    .into_iter()
-    .filter_map(
-      |QueryableMIDIComposition {
-         id,
-         name,
-         description,
-         composition_json,
-         user_id,
-         created_at,
-         is_featured,
-       }| {
-        let composition: SerializedMIDIEditorState = match serde_json::from_str(&composition_json) {
-          Ok(parsed) => parsed,
-          Err(err) => {
-            error!("Error deserializing stored MIDI composition: {:?}", err);
-            return None;
-          },
-        };
-        Some(MIDIComposition {
-          id,
-          name,
-          description,
-          composition,
-          tags: Vec::new(),
-          user_id,
-          created_at,
-          is_featured,
-        })
+  let (compositions, all_tags_for_compositions) = conn
+    .run(
+      |conn| -> QueryResult<(
+        Vec<(i64, String, String, Option<i64>, Option<NaiveDateTime>, bool)>,
+        Vec<EntityIdTag>,
+      )> {
+        let compositions = midi_compositions::table
+          .select((
+            midi_compositions::dsl::id,
+            midi_compositions::dsl::name,
+            midi_compositions::dsl::description,
+            midi_compositions::dsl::user_id,
+            midi_compositions::dsl::created_at,
+            midi_compositions::dsl::is_featured,
+          ))
+          .load(conn)?;
+
+        let all_tags_for_compositions = midi_compositions_tags::table
+          .inner_join(tags::table)
+          .select((
+            midi_compositions_tags::dsl::midi_composition_id,
+            tags::dsl::tag,
+          ))
+          .load(conn)?;
+
+        Ok((compositions, all_tags_for_compositions))
       },
     )
-    .collect_vec();
+    .await
+    .map_err(|err| {
+      error!("Error querying MIDI compositions from DB: {:?}", err);
+      String::from("DB Error")
+    })?;
 
-  let all_tags_for_compositions: Vec<EntityIdTag> = conn
-    .run(|conn| {
-      midi_compositions_tags::table
-        .inner_join(tags::table)
-        .select((
-          midi_compositions_tags::dsl::midi_composition_id,
-          tags::dsl::tag,
-        ))
-        .load(conn)
-        .map_err(|err| {
-          error!("Error querying MIDI compositions tags from DB: {:?}", err);
-          String::from("DB Error")
-        })
-    })
-    .await?;
-  let tags_by_composition_id = all_tags_for_compositions
+  let mut tags_by_composition_id = all_tags_for_compositions
     .into_iter()
     .into_group_map_by(|tag| tag.entity_id);
 
-  Ok(Json(
-    compositions
-      .into_iter()
-      .map(|mut comp| {
-        let tags = tags_by_composition_id
-          .get(&comp.id)
-          .map(|tags| tags.into_iter().map(|tag| tag.tag.clone()).collect())
-          .unwrap_or_default();
-        comp.tags = tags;
-        comp
-      })
-      .collect_vec(),
-  ))
+  let descriptors = compositions
+    .into_iter()
+    .map(|(id, name, description, user_id, created_at, is_featured)| {
+      let tags = tags_by_composition_id
+        .remove(&id)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|tag| tag.tag)
+        .collect();
+      MIDICompositionDescriptor {
+        id,
+        name,
+        description,
+        tags,
+        user_id,
+        created_at,
+        is_featured,
+      }
+    })
+    .collect_vec();
+
+  Ok(Json(descriptors))
+}
+
+#[get("/midi_composition/<composition_id>")]
+pub async fn get_midi_composition_by_id(
+  conn: WebSynthDbConn,
+  composition_id: i64,
+) -> Result<Option<Json<SerializedMIDIEditorState>>, String> {
+  use crate::schema::midi_compositions;
+
+  let composition_json: Option<String> = conn
+    .run(move |conn| {
+      midi_compositions::table
+        .find(composition_id)
+        .select(midi_compositions::dsl::composition_json)
+        .first(conn)
+        .optional()
+    })
+    .await
+    .map_err(|err| {
+      error!("Error querying MIDI composition from DB: {:?}", err);
+      String::from("DB Error")
+    })?;
+
+  let composition_json = match composition_json {
+    Some(composition_json) => composition_json,
+    None => return Ok(None),
+  };
+  let composition: SerializedMIDIEditorState =
+    serde_json::from_str(&composition_json).map_err(|err| {
+      error!("Error deserializing stored MIDI composition: {:?}", err);
+      String::from("Error deserializing stored MIDI composition")
+    })?;
+
+  Ok(Some(Json(composition)))
 }
 
 #[post("/midi_compositions", data = "<composition>")]
