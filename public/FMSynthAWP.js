@@ -252,7 +252,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
             return;
           }
 
-          this.wasmInstance.exports.gate(this.ctxPtr, evt.data.midiNumber);
+          this.wasmInstance.exports.gate(this.ctxPtr, evt.data.midiNumber, evt.data.velocity ?? 90, 0);
           break;
         }
         case 'ungate': {
@@ -261,7 +261,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
             return;
           }
 
-          this.wasmInstance.exports.ungate(this.ctxPtr, evt.data.midiNumber);
+          this.wasmInstance.exports.ungate(this.ctxPtr, evt.data.midiNumber, 0);
           break;
         }
         case 'setDetune': {
@@ -633,14 +633,13 @@ class FMSynthAWP extends AudioWorkletProcessor {
       this.midiClient = globalThis.transport.createClient(this.mailboxID);
     }
 
-    // Phase 1 ignores `e.sampleOffset`; honoring it is Phase 2 (sub-frame onset in the FM voice).
     for (const e of globalThis.transport.pollMIDI(this.midiClient, currentFrame)) {
       switch (e.type) {
         case 0: // Attack
-          this.wasmInstance.exports.gate(this.ctxPtr, e.param0, e.param1);
+          this.wasmInstance.exports.gate(this.ctxPtr, e.param0, e.param1, e.sampleOffset);
           break;
         case 1: // Release
-          this.wasmInstance.exports.ungate(this.ctxPtr, e.param0);
+          this.wasmInstance.exports.ungate(this.ctxPtr, e.param0, e.sampleOffset);
           break;
         case 2: // Pitch bend
           console.error('Pitch bend not implemented');

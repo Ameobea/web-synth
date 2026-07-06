@@ -111,7 +111,12 @@ class LfoAWP extends AudioWorkletProcessor {
       this.freqBuf.set(freqParam);
     }
 
-    const curBeat = globalThis.curBeat;
+    // Read the beat via the transport when running: `globalThis.curBeat` is one frame stale for
+    // nodes that process before the event scheduler within a render quantum.
+    const curBeat =
+      globalThis.globalBeatCounterStarted && globalThis.transport
+        ? globalThis.transport.beatAt(currentFrame)
+        : globalThis.curBeat;
     const playbackDidStartOrRestart =
       globalThis.globalBeatCounterStarted && this.lastPlaybackSeq !== globalThis.playbackSeq;
     if (playbackDidStartOrRestart) {

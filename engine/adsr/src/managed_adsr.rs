@@ -30,12 +30,25 @@ impl ManagedAdsr {
   pub fn render(&mut self) { self.adsr.render(); }
 
   pub fn render_frame(&mut self, scale: f32, shift: f32, cur_bpm: f32, cur_frame_start_beat: f32) {
+    self.render_frame_from(0, scale, shift, cur_bpm, cur_frame_start_beat);
+  }
+
+  pub fn render_frame_from(
+    &mut self,
+    start_ix: usize,
+    scale: f32,
+    shift: f32,
+    cur_bpm: f32,
+    cur_frame_start_beat: f32,
+  ) {
     let length_samples = self.get_len_samples(cur_bpm);
     let length_beats = match self.length_mode {
       AdsrLengthMode::Ms => None,
       AdsrLengthMode::Beats => Some(self.length),
     };
     self.adsr.set_len(length_samples, length_beats);
-    self.adsr.render_frame(scale, shift, cur_frame_start_beat);
+    self
+      .adsr
+      .render_frame_from(start_ix, scale, shift, cur_frame_start_beat);
   }
 }

@@ -1,6 +1,14 @@
 const FRAME_SIZE = 128;
 const BYTES_PER_F32 = 32 / 8;
 
+// Order-independent beat read: `globalThis.curBeat` is written by the event scheduler AWP's
+// `process()`, so it's one frame stale for any node that happens to process before it within a
+// render quantum.  The transport computes the beat for `currentFrame` directly.
+const getCurBeat = () =>
+  globalThis.globalBeatCounterStarted && globalThis.transport
+    ? globalThis.transport.beatAt(currentFrame)
+    : globalThis.curBeat;
+
 class MultiADSR2AWP extends AudioWorkletProcessor {
   constructor(options) {
     super();
@@ -85,7 +93,7 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
             console.warn('Tried to gate before wasm inst initialize in ADSR2 AWP');
             break;
           }
-          this.wasmInstance.exports.gate_adsr(this.ctxPtr, evt.data.index, globalThis.curBeat);
+          this.wasmInstance.exports.gate_adsr(this.ctxPtr, evt.data.index, getCurBeat());
           break;
         }
         case 'ungate': {
@@ -233,7 +241,7 @@ class MultiADSR2AWP extends AudioWorkletProcessor {
       this.outputRange[0],
       this.outputRange[1],
       globalThis.globalTempoBPM,
-      globalThis.curBeat
+      getCurBeat()
     );
     // Record the current phase of the most recently gated ADSR which will be displayed
     // in the UI as an indicator on the ADSR UI

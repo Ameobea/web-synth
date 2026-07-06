@@ -871,6 +871,10 @@ pub struct FMSynthVoice {
   pub last_gated_midi_number: usize,
   /// Computed from the velocity param of MIDI events and multiplied into all outgoing samples.
   pub velocity_gain_multiplier: f32,
+  /// Sample index within the current frame at which this voice's most recent gate lands.  Set
+  /// when gated mid-frame and consumed (reset to 0) by the next `generate`; samples before it
+  /// are rendered as silence.
+  pub attack_start_sample_ix: usize,
 }
 
 /// Applies modulation from all other operators to the provided frequency, returning the modulated
@@ -1029,6 +1033,7 @@ impl FMSynthVoice {
       filter_module: FilterModule::default(),
       last_gated_midi_number: 0,
       velocity_gain_multiplier: 1.,
+      attack_start_sample_ix: 0,
     }
   }
 
@@ -1043,6 +1048,7 @@ impl FMSynthVoice {
     output_buffer: &mut [f32; FRAME_SIZE],
     detune: Option<&ParamSource>,
     sample_mapping_manager: &SampleMappingManager,
+    start_sample_ix: usize,
   ) {
     let mut samples_per_operator_bufs: [[f32; OPERATOR_COUNT]; 2] = [self.last_samples, uninit()];
     let mut last_samples_per_operator: &mut [f32; OPERATOR_COUNT] =
@@ -1066,7 +1072,7 @@ impl FMSynthVoice {
                 // Cannot use ADSR or base frequency as param sources for ADSR length
                 .get(param_buffers, &[], 0, 0.);
       adsr.set_len(len_samples, None);
-      adsr.render_frame(1., 0., 0.);
+      adsr.render_frame_from(start_sample_ix, 1., 0., 0.);
     }
 
     // If necessary, compute detuned base frequency based off of detune param
@@ -1146,7 +1152,8 @@ impl FMSynthVoice {
       }
     }
 
-    for sample_ix_within_frame in 0..FRAME_SIZE {
+    output_buffer[..start_sample_ix].fill(0.);
+    for sample_ix_within_frame in start_sample_ix..FRAME_SIZE {
       let mut output_sample = 0.0f32;
 
       let base_frequency = *unsafe { base_frequencies.get_unchecked(sample_ix_within_frame) };
@@ -1244,9 +1251,12 @@ impl FMSynthVoice {
 
     // finally, apply the gain multiplier computed from the velocity of the MIDI event that
     // triggered this voice
-    for sample in output_buffer {
+    for sample in &mut *output_buffer {
       *sample *= self.velocity_gain_multiplier;
     }
+
+    // effects can produce non-zero output from the pre-attack silence (DC offsets etc.)
+    output_buffer[..start_sample_ix].fill(0.);
   }
 }
 
@@ -1296,6 +1306,20 @@ pub enum ModulationMode {
   Phase = 1,
 }
 
+#[derive(Clone, Copy)]
+pub enum QueuedEventKind {
+  Gate { midi_number: usize, velocity: u8 },
+  Ungate { midi_number: usize },
+}
+
+/// A MIDI event received this frame, deferred so it can be applied at its exact sample offset
+/// within the frame during `generate`.
+#[derive(Clone, Copy)]
+pub struct QueuedEvent {
+  pub sample_ix_within_frame: u32,
+  pub kind: QueuedEventKind,
+}
+
 pub struct FMSynthContext {
   pub voices: Box<[FMSynthVoice; VOICE_COUNT]>,
   pub modulation_mode: ModulationMode,
@@ -1321,6 +1345,7 @@ pub struct FMSynthContext {
   pub detune: Option<ParamSource>,
   pub wavetables: Vec<WaveTable>,
   pub sample_mapping_manager: SampleMappingManager,
+  pub pending_events: Vec<QueuedEvent>,
   pub polysynth: PolySynth<
     Box<dyn Fn(usize, usize, u8, Option<f32>)>,
     Box<dyn Fn(usize, usize, Option<f32>)>,
@@ -1331,7 +1356,35 @@ pub struct FMSynthContext {
 static mut DID_LOG_NAN: bool = false;
 
 impl FMSynthContext {
+  /// Applies MIDI events received since the last frame in sample-offset order.  The polysynth
+  /// callbacks record each gated voice's `attack_start_sample_ix` so rendering can start
+  /// mid-frame; releases are applied in the same ordered pass (so a same-frame attack/release
+  /// pair can't deadlock a voice) but still take effect from the start of the frame.
+  fn drain_pending_events(&mut self) {
+    if self.pending_events.is_empty() {
+      return;
+    }
+
+    let mut events = std::mem::take(&mut self.pending_events);
+    events.sort_by_key(|evt| evt.sample_ix_within_frame);
+    for evt in &events {
+      let offset = Some(evt.sample_ix_within_frame.min(FRAME_SIZE as u32 - 1) as f32);
+      match evt.kind {
+        QueuedEventKind::Gate {
+          midi_number,
+          velocity,
+        } => self.polysynth.trigger_attack(midi_number, velocity, offset),
+        QueuedEventKind::Ungate { midi_number } =>
+          self.polysynth.trigger_release(midi_number, offset),
+      }
+    }
+    events.clear();
+    self.pending_events = events;
+  }
+
   pub fn generate(&mut self, cur_bpm: f32, cur_frame_start_beat: f32) {
+    self.drain_pending_events();
+
     for (voice_ix, voice) in self.voices.iter_mut().enumerate() {
       let base_frequency_buffer =
         unsafe { self.base_frequency_input_buffer.get_unchecked_mut(voice_ix) };
@@ -1345,10 +1398,15 @@ impl FMSynthContext {
       }
 
       let output_buffer = unsafe { self.output_buffers.get_unchecked_mut(voice_ix) };
+      let start_sample_ix = std::mem::take(&mut voice.attack_start_sample_ix);
       let was_done = voice.gain_envelope_generator.adsr.gate_status == GateStatus::Done;
-      voice
-        .gain_envelope_generator
-        .render_frame(1., 0., cur_bpm, cur_frame_start_beat);
+      voice.gain_envelope_generator.render_frame_from(
+        start_sample_ix,
+        1.,
+        0.,
+        cur_bpm,
+        cur_frame_start_beat,
+      );
       let is_done = voice.gain_envelope_generator.adsr.gate_status == GateStatus::Done;
       if !was_done && is_done {
         base_frequency_buffer.fill(0.);
@@ -1366,6 +1424,7 @@ impl FMSynthContext {
         output_buffer,
         self.detune.as_ref(),
         &self.sample_mapping_manager,
+        start_sample_ix,
       );
 
       if !voice.filter_module.is_bypassed {
@@ -1375,6 +1434,7 @@ impl FMSynthContext {
           &self.filter_param_buffers,
           cur_bpm,
           cur_frame_start_beat,
+          start_sample_ix,
         );
       }
 
@@ -1455,6 +1515,7 @@ impl FMSynthContext {
         &self.filter_param_buffers,
         cur_bpm,
         cur_frame_start_beat,
+        0,
       );
     }
     let last = FRAME_SIZE - 1;
@@ -1529,6 +1590,8 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
     std::ptr::write(wavetables_ptr, Vec::new());
     let sample_mapping_manager_ptr = &mut (*ctx.as_mut_ptr()).sample_mapping_manager;
     std::ptr::write(sample_mapping_manager_ptr, SampleMappingManager::default());
+    let pending_events_ptr = &mut (*ctx.as_mut_ptr()).pending_events;
+    std::ptr::write(pending_events_ptr, Vec::new());
     (*ctx.as_mut_ptr()).master_gain = 1.;
     (*ctx.as_mut_ptr()).last_master_gain = 1.;
   }
@@ -1538,9 +1601,11 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
     &mut (*ctx).polysynth,
     PolySynth::new(SynthCallbacks {
       trigger_attack: Box::new(
-        move |voice_ix: usize, note_id: usize, velocity: u8, _offset: Option<f32>| {
+        move |voice_ix: usize, note_id: usize, velocity: u8, offset: Option<f32>| {
           let frequency = midi_number_to_frequency(note_id) * (*ctx).frequency_multiplier;
           (&mut *ctx).base_frequency_input_buffer[voice_ix].fill(frequency);
+          (*ctx).voices[voice_ix].attack_start_sample_ix =
+            offset.map(|o| o as usize).unwrap_or(0);
           gate_voice_inner(ctx, voice_ix, note_id, velocity);
           on_gate_cb(note_id, voice_ix);
         },
@@ -2080,8 +2145,19 @@ pub unsafe extern "C" fn get_adsr_phases_buf_ptr(ctx: *mut FMSynthContext) -> *c
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn gate(ctx: *mut FMSynthContext, midi_number: usize, velocity: u8) {
-  (*ctx).polysynth.trigger_attack(midi_number, velocity, None);
+pub unsafe extern "C" fn gate(
+  ctx: *mut FMSynthContext,
+  midi_number: usize,
+  velocity: u8,
+  sample_ix_within_frame: u32,
+) {
+  (*ctx).pending_events.push(QueuedEvent {
+    sample_ix_within_frame,
+    kind: QueuedEventKind::Gate {
+      midi_number,
+      velocity,
+    },
+  });
 }
 
 /// Converts the MIDI velocity value in [0, 127] to a gain multiplier.  This maps the velocities to
@@ -2152,12 +2228,22 @@ pub unsafe extern "C" fn fm_synth_set_frequency_multiplier(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ungate(ctx: *mut FMSynthContext, midi_number: usize) {
-  (*ctx).polysynth.trigger_release(midi_number, None);
+pub unsafe extern "C" fn ungate(
+  ctx: *mut FMSynthContext,
+  midi_number: usize,
+  sample_ix_within_frame: u32,
+) {
+  (*ctx).pending_events.push(QueuedEvent {
+    sample_ix_within_frame,
+    kind: QueuedEventKind::Ungate { midi_number },
+  });
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ungate_all(ctx: *mut FMSynthContext) { (*ctx).polysynth.release_all(); }
+pub unsafe extern "C" fn ungate_all(ctx: *mut FMSynthContext) {
+  (*ctx).pending_events.clear();
+  (*ctx).polysynth.release_all();
+}
 
 unsafe fn ungate_voice_inner(ctx: *mut FMSynthContext, voice_ix: usize) {
   let voice = &mut (*ctx).voices[voice_ix];

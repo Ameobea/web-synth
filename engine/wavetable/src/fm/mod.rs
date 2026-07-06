@@ -10,3 +10,5 @@ mod samples;
 mod standalone_fx;
 #[cfg(feature = "exports")]
 pub mod synth;
+#[cfg(all(test, feature = "exports"))]
+mod tests;

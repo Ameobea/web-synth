@@ -294,12 +294,19 @@ impl FilterModule {
     filter_param_buffers: &[[f32; FRAME_SIZE]; FILTER_PARAM_BUFFER_COUNT],
     cur_bpm: f32,
     cur_frame_start_beat: f32,
+    start_sample_ix: usize,
   ) {
     match &self.cutoff_freq {
       ParamSource::Constant { .. } => (),
       ParamSource::ParamBuffer(_) => (),
       ParamSource::PerVoiceADSR(_) => {
-        filter_envelope_generator.render_frame(1., 0., cur_bpm, cur_frame_start_beat);
+        filter_envelope_generator.render_frame_from(
+          start_sample_ix,
+          1.,
+          0.,
+          cur_bpm,
+          cur_frame_start_beat,
+        );
       },
       _ => panic!("Unsupported ParamSource for cutoff_freq"),
     }
@@ -335,6 +342,7 @@ impl FilterModule {
     filter_param_buffers: &[[f32; FRAME_SIZE]; FILTER_PARAM_BUFFER_COUNT],
     cur_bpm: f32,
     cur_frame_start_beat: f32,
+    start_sample_ix: usize,
   ) {
     if self.is_bypassed {
       return;
@@ -345,6 +353,7 @@ impl FilterModule {
       filter_param_buffers,
       cur_bpm,
       cur_frame_start_beat,
+      start_sample_ix,
     );
 
     self.filter_state.apply_frame(

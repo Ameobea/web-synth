@@ -56,6 +56,9 @@ pub struct Grain {
   /// Value [0, 1] representing how far through the grain we are.  This goes from 0 to 1 regardless
   /// of whether the grain is playing forwards or backwards.
   pub phase: f32,
+  /// Sample index within the next processed frame at which this grain starts playing.  Only
+  /// non-zero for the grain's first frame when it was triggered mid-frame.
+  pub start_offset_samples: usize,
 }
 
 impl Grain {
@@ -71,9 +74,11 @@ impl Grain {
       reverse,
     } = self.config;
 
+    let start_offset = std::mem::take(&mut self.start_offset_samples);
+    let samples_this_frame = FRAME_SIZE - start_offset;
+
     let grain_len_samples = grain_end_sample_ix - grain_start_sample_ix;
-    let played_samples_per_frame = playback_rate * FRAME_SIZE as f32;
-    let grain_len_frames = grain_len_samples / played_samples_per_frame;
+    let played_samples_this_frame = playback_rate * samples_this_frame as f32;
 
     let frame_start_sample_ix = dsp::mix(
       if !reverse {
@@ -85,17 +90,17 @@ impl Grain {
       grain_end_sample_ix,
     );
     let frame_end_sample_ix = if reverse {
-      frame_start_sample_ix - played_samples_per_frame
+      frame_start_sample_ix - played_samples_this_frame
     } else {
-      frame_start_sample_ix + played_samples_per_frame
+      frame_start_sample_ix + played_samples_this_frame
     };
 
     // how much the grain phase will be incremented by this frame
-    let frame_length_phase = 1. / grain_len_frames;
+    let frame_length_phase = played_samples_this_frame / grain_len_samples;
     let (old_phase, new_phase) = (self.phase, self.phase + frame_length_phase);
 
     let mut frame_phase = 0.;
-    for sample_ix_in_frame in 0..FRAME_SIZE {
+    for sample_ix_in_frame in start_offset..FRAME_SIZE {
       let sample_ix_in_sample_data =
         dsp::mix(frame_phase, frame_end_sample_ix, frame_start_sample_ix);
       if sample_ix_in_sample_data < 0. || sample_ix_in_sample_data >= (sample_data.len() - 1) as f32
@@ -109,7 +114,7 @@ impl Grain {
       let crossfade_amp_factor = crossfade.get_amp_factor(grain_phase, grain_len_samples);
       output[sample_ix_in_frame] += base_sample * crossfade_amp_factor;
 
-      frame_phase += 1. / (FRAME_SIZE - 1) as f32;
+      frame_phase += 1. / (samples_this_frame - 1).max(1) as f32;
     }
 
     self.phase = new_phase;
@@ -239,14 +244,43 @@ pub extern "C" fn sampler_clear_selection(ctx: *mut SamplerCtx, selection_ix: us
 }
 
 #[no_mangle]
-pub extern "C" fn sampler_handle_midi_attack(ctx: *mut SamplerCtx, midi_number: usize) {
+pub extern "C" fn sampler_handle_midi_attack(
+  ctx: *mut SamplerCtx,
+  midi_number: usize,
+  sample_ix_within_frame: usize,
+) {
   let ctx = unsafe { &mut *ctx };
   let grain_config = ctx.selections_by_midi_number[midi_number].clone();
   if let Some(grain_config) = grain_config {
     let grain = Grain {
       config: grain_config,
       phase: 0.,
+      start_offset_samples: sample_ix_within_frame.min(FRAME_SIZE - 1),
     };
     ctx.active_grains.push(grain);
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn mid_frame_attack_starts_at_offset() {
+    let ctx = init_sampler_ctx();
+    let ctx_ref = unsafe { &mut *ctx };
+    ctx_ref.sample_data = vec![1.; 1024];
+    sampler_set_selection(ctx, 60, 0., 512., 4., 4., 1., false);
+
+    let offset = 40;
+    sampler_handle_midi_attack(ctx, 60, offset);
+    sampler_process(ctx);
+    let out = &ctx_ref.output_buf;
+    assert!(out[..offset].iter().all(|&s| s == 0.));
+    assert!(out[offset..].iter().any(|&s| s != 0.));
+
+    // subsequent frames render fully
+    sampler_process(ctx);
+    assert!(ctx_ref.output_buf.iter().all(|&s| s != 0.));
   }
 }

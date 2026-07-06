@@ -156,7 +156,7 @@ class SamplerAWP extends AudioWorkletProcessor {
       const note = e.param0;
       switch (e.type) {
         case 0: {
-          this.wasmInstance.exports.sampler_handle_midi_attack(this.ctxPtr, note);
+          this.wasmInstance.exports.sampler_handle_midi_attack(this.ctxPtr, note, e.sampleOffset);
           if (this.transmitMIDIAttack) {
             this.port.postMessage({ type: 'midiAttack', midiNumber: note });
             this.transmitMIDIAttack = false;

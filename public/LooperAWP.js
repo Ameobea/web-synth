@@ -175,9 +175,14 @@ class LooperAWP extends AudioWorkletProcessor {
       this.wasmInstance.exports.looper_on_playback_start();
     }
 
+    // Transport read avoids the one-frame staleness of `globalThis.curBeat` for nodes that
+    // process before the event scheduler within a render quantum
+    const curBeat = globalThis.transport
+      ? globalThis.transport.beatAt(currentFrame)
+      : globalThis.curBeat;
     const phase = this.wasmInstance.exports.looper_process(
       this.moduleIxForWhichToReportPhase,
-      globalThis.curBeat
+      curBeat
     );
     if (this.curPhaseBuffer) {
       this.curPhaseBuffer[0] = phase;

@@ -116,7 +116,13 @@ class SampleEditorAWP extends AudioWorkletProcessor {
       return true;
     }
 
-    this.wasmInst.exports.process_sample_editor(this.ctxPtr, globalThis.curBeat);
+    // Transport read avoids the one-frame staleness of `globalThis.curBeat` for nodes that
+    // process before the event scheduler within a render quantum
+    const curBeat =
+      globalThis.globalBeatCounterStarted && globalThis.transport
+        ? globalThis.transport.beatAt(currentFrame)
+        : globalThis.curBeat;
+    this.wasmInst.exports.process_sample_editor(this.ctxPtr, curBeat);
 
     return true;
   }

@@ -631,6 +631,19 @@ impl Adsr {
 
   /// Populates `self.cur_frame_output` with samples for the current frame
   pub fn render_frame(&mut self, scale: f32, shift: f32, cur_frame_start_beat: f32) {
+    self.render_frame_from(0, scale, shift, cur_frame_start_beat);
+  }
+
+  /// Like `render_frame` but only renders samples `[start_ix, FRAME_SIZE)`, advancing the
+  /// envelope by that many samples.  Used when a voice is gated partway through a frame;
+  /// `cur_frame_output[..start_ix]` is left untouched and must be masked by the caller.
+  pub fn render_frame_from(
+    &mut self,
+    start_ix: usize,
+    scale: f32,
+    shift: f32,
+    cur_frame_start_beat: f32,
+  ) {
     let mut cur_frame_start_phase = self.phase;
     match self.gate_status {
       GateStatus::Gated
@@ -675,11 +688,11 @@ impl Adsr {
       _ => (),
     }
 
-    for i in 0..FRAME_SIZE {
+    for i in start_ix..FRAME_SIZE {
       self.cur_frame_output[i] = self.get_sample(
         &mut cur_frame_start_phase,
         cur_frame_start_beat,
-        i,
+        i - start_ix,
         scale,
         shift,
       );
