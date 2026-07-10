@@ -89,10 +89,10 @@ pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: f32, end_ms: f32
   let ctx = unsafe { &mut *ctx };
 
   if ctx.waveform_buf.is_empty() {
+    // Fill opaque black; the buffer is `set_len`'d over uninitialized memory, so the alpha and
+    // color bytes must all be written or garbage pixels get displayed.
     for (i, cell) in ctx.image_data_buf.iter_mut().enumerate() {
-      if i % 4 == 0 {
-        *cell = 0;
-      }
+      *cell = if i % 4 == 3 { 255 } else { 0 };
     }
     return ctx.image_data_buf.as_mut_ptr();
   }
@@ -114,46 +114,50 @@ pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: f32, end_ms: f32
 
   let start_sample_ix = ms_to_samples(ctx.sample_rate, start_ms).min(ctx.waveform_buf.len() as u32);
   let end_sample_ix = ms_to_samples(ctx.sample_rate, end_ms).min(ctx.waveform_buf.len() as u32);
-  assert!(
-    end_sample_ix > start_sample_ix,
-    "Start sample after end? start_ms={}, end_ms={}, start_sample_ix={}, end_sample_ix={}",
-    start_ms,
-    end_ms,
-    start_sample_ix,
-    end_sample_ix
-  );
+  // Can happen when the view is scrolled/zoomed entirely past the end of the sample; there's
+  // nothing to draw, and returning here avoids a panic that would poison the render worker.
+  if end_sample_ix <= start_sample_ix {
+    return ctx.image_data_buf.as_mut_ptr();
+  }
+  assert_eq!(ctx.height_px % 2, 0, "Height must be divisible by 2");
 
   let len_samples = end_sample_ix - start_sample_ix;
-  let samples_per_px = (len_samples / ctx.width_px).max(1);
-  assert_eq!(ctx.height_px % 2, 0, "Height must be divisible by 2");
+  // Fractional so the rendered span matches the requested view exactly at any zoom.  With integer
+  // division the image desynced from the selection overlay and, when fewer samples than pixels
+  // were in view, the column loop read past the end of the buffer.
+  let samples_per_px = len_samples as f32 / ctx.width_px as f32;
 
   let max_distance_from_0 = ctx.waveform_buf[start_sample_ix as usize..end_sample_ix as usize]
     .iter()
-    .fold(0.0f32, |acc, sample| acc.max(sample.abs()));
+    .fold(0.0f32, |acc, sample| acc.max(sample.abs()))
+    .max(1e-6);
   let half_height_f32 = (ctx.height_px / 2) as f32;
+  let max_y = ctx.height_px - 1;
 
-  let mut last_y_ix = ctx.height_px / 2;
+  let mut last_y = ctx.height_px / 2;
   for w in 0..ctx.width_px {
-    let start_sample_ix = start_sample_ix + w * samples_per_px;
-    let samples_indices_to_consider = start_sample_ix..(start_sample_ix + samples_per_px);
+    let col_start = start_sample_ix + (w as f32 * samples_per_px) as u32;
+    let col_end = (start_sample_ix + ((w + 1) as f32 * samples_per_px) as u32)
+      .max(col_start + 1)
+      .min(end_sample_ix);
 
-    for i in samples_indices_to_consider {
-      let y_px = sample_to_y_val(
-        ctx.waveform_buf[i as usize],
-        half_height_f32,
-        max_distance_from_0,
-      );
-
-      for y_px in last_y_ix.min(y_px)..=last_y_ix.max(y_px) {
-        if let Some(cell) = ctx
-          .image_data_buf
-          .get_mut(((y_px * ctx.width_px + w) as usize) * BYTES_PER_PX)
-        {
-          *cell = 255;
-        }
-      }
-      last_y_ix = y_px;
+    let (mut min_s, mut max_s) = (f32::INFINITY, f32::NEG_INFINITY);
+    for i in col_start..col_end {
+      let s = ctx.waveform_buf[i as usize];
+      min_s = min_s.min(s);
+      max_s = max_s.max(s);
     }
+
+    let ya = sample_to_y_val(min_s, half_height_f32, max_distance_from_0).min(max_y);
+    let yb = sample_to_y_val(max_s, half_height_f32, max_distance_from_0).min(max_y);
+    let col_lo = ya.min(yb);
+    let col_hi = ya.max(yb);
+
+    // Bridge to the previous column so the trace stays continuous when zoomed in.
+    for y in col_lo.min(last_y)..=col_hi.max(last_y) {
+      ctx.image_data_buf[((y * ctx.width_px + w) as usize) * BYTES_PER_PX] = 255;
+    }
+    last_y = (col_lo + col_hi) / 2;
   }
 
   ctx.image_data_buf.as_mut_ptr()

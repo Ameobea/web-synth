@@ -209,6 +209,16 @@ export const cleanup_faust_editor = (stateKey: string) => {
   const vcId = stateKey.split('_')[1]!;
 
   persist_faust_editor(stateKey);
+
+  const context = faustEditorContextMap[vcId];
+  if (context) {
+    if (context.faustNode) {
+      context.faustNode.disconnect();
+      context.faustNode.shutdown();
+    }
+    context.analyzerNode.disconnect();
+    Object.values(context.overrideableParams).forEach(param => param.dispose());
+  }
   delete faustEditorContextMap[vcId];
 
   const faustEditorReactRootNode = document.getElementById(buildRootNodeId(vcId));

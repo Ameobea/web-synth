@@ -40,15 +40,12 @@ export interface GranulatorInstance {
   startSample: OverridableAudioParam;
   endSample: OverridableAudioParam;
   grainSize: OverridableAudioParam;
-  voice1SamplesBetweenGrains: OverridableAudioParam;
-  voice2SamplesBetweenGrains: OverridableAudioParam;
+  samplesBetweenGrains: OverridableAudioParam;
   sampleSpeedRatio: OverridableAudioParam;
-  voice1FilterCutoff: OverridableAudioParam;
-  voice2FilterCutoff: OverridableAudioParam;
+  filterCutoff: OverridableAudioParam;
   linearSlopeLength: OverridableAudioParam;
   slopeLinearity: OverridableAudioParam;
-  voice1MovementSamplesPerSample: OverridableAudioParam;
-  voice2MovementSamplesPerSample: OverridableAudioParam;
+  movementSamplesPerSample: OverridableAudioParam;
   selectedSample: SampleDescriptor | null;
   waveformRenderer: WaveformRenderer;
 }
@@ -73,17 +70,12 @@ const serializeGranulator = (vcId: string): string => {
   }
   const controlPanelState: GranulatorControlPanelState = {
     grain_size: inst.grainSize.manualControl.offset.value,
-    voice_1_samples_between_grains: inst.voice1SamplesBetweenGrains.manualControl.offset.value,
-    voice_2_samples_between_grains: inst.voice2SamplesBetweenGrains.manualControl.offset.value,
+    samples_between_grains: inst.samplesBetweenGrains.manualControl.offset.value,
     sample_speed_ratio: inst.sampleSpeedRatio.manualControl.offset.value,
-    voice_1_filter_cutoff: inst.voice1FilterCutoff.manualControl.offset.value,
-    voice_2_filter_cutoff: inst.voice2FilterCutoff.manualControl.offset.value,
+    filter_cutoff: inst.filterCutoff.manualControl.offset.value,
     linear_slope_length: inst.linearSlopeLength.manualControl.offset.value,
     slope_linearity: inst.slopeLinearity.manualControl.offset.value,
-    voice_1_movement_samples_per_sample:
-      inst.voice1MovementSamplesPerSample.manualControl.offset.value,
-    voice_2_movement_samples_per_sample:
-      inst.voice2MovementSamplesPerSample.manualControl.offset.value,
+    movement_samples_per_sample: inst.movementSamplesPerSample.manualControl.offset.value,
   };
   const serialized: SerializedGranulator = {
     controlPanelState,
@@ -98,15 +90,12 @@ const serializeGranulator = (vcId: string): string => {
 const buildDefaultGranulatorState = (): SerializedGranulator => ({
   controlPanelState: {
     grain_size: 800.0,
-    voice_1_samples_between_grains: 800.0,
-    voice_2_samples_between_grains: 800.0,
+    samples_between_grains: 800.0,
     sample_speed_ratio: 1.0,
-    voice_1_filter_cutoff: 0.0,
-    voice_2_filter_cutoff: 0.0,
+    filter_cutoff: 0.0,
     linear_slope_length: 0.3,
     slope_linearity: 0.6,
-    voice_1_movement_samples_per_sample: 1,
-    voice_2_movement_samples_per_sample: 1,
+    movement_samples_per_sample: 1,
   },
   selectedSample: null,
   startSample: null,
@@ -156,11 +145,11 @@ export const build_granulator_audio_connectables = (vcId: string): AudioConnecta
     inputs: ImmMap<string, ConnectableInput>()
       .set('start_sample', { type: 'number', node: inst.startSample })
       .set('end sample', { type: 'number', node: inst.endSample })
-      .set('filter cutoff', { type: 'number', node: inst.voice1FilterCutoff })
+      .set('filter cutoff', { type: 'number', node: inst.filterCutoff })
       .set('sample speed ratio', { type: 'number', node: inst.sampleSpeedRatio })
       .set('playhead movement speed ratio', {
         type: 'number',
-        node: inst.voice1MovementSamplesPerSample,
+        node: inst.movementSamplesPerSample,
       })
       .set('recording_input', { type: 'customAudio', node: inst.node }),
     outputs: ImmMap<string, ConnectableOutput>().set('output', {
@@ -205,26 +194,14 @@ export const init_granulator = async (stateKey: string) => {
       startSample: new OverridableAudioParam(ctx, params.get('start_sample')),
       endSample: new OverridableAudioParam(ctx, params.get('end_sample')),
       grainSize: new OverridableAudioParam(ctx, params.get('grain_size')),
-      voice1SamplesBetweenGrains: new OverridableAudioParam(
-        ctx,
-        params.get('voice_1_samples_between_grains')
-      ),
-      voice2SamplesBetweenGrains: new OverridableAudioParam(
-        ctx,
-        params.get('voice_2_samples_between_grains')
-      ),
+      samplesBetweenGrains: new OverridableAudioParam(ctx, params.get('samples_between_grains')),
       sampleSpeedRatio: new OverridableAudioParam(ctx, params.get('sample_speed_ratio')),
-      voice1FilterCutoff: new OverridableAudioParam(ctx, params.get('voice_1_filter_cutoff')),
-      voice2FilterCutoff: new OverridableAudioParam(ctx, params.get('voice_2_filter_cutoff')),
+      filterCutoff: new OverridableAudioParam(ctx, params.get('filter_cutoff')),
       linearSlopeLength: new OverridableAudioParam(ctx, params.get('linear_slope_length')),
       slopeLinearity: new OverridableAudioParam(ctx, params.get('slope_linearity')),
-      voice1MovementSamplesPerSample: new OverridableAudioParam(
+      movementSamplesPerSample: new OverridableAudioParam(
         ctx,
-        params.get('voice_1_movement_samples_per_sample')
-      ),
-      voice2MovementSamplesPerSample: new OverridableAudioParam(
-        ctx,
-        params.get('voice_2_movement_samples_per_sample')
+        params.get('movement_samples_per_sample')
       ),
       selectedSample: initialState.selectedSample,
       waveformRenderer,
@@ -292,6 +269,15 @@ export const cleanup_granulator = (stateKey: string) => {
     inst.node.port.postMessage({ type: 'shutdown' });
     inst.startSample.dispose();
     inst.endSample.dispose();
+    inst.grainSize.dispose();
+    inst.samplesBetweenGrains.dispose();
+    inst.sampleSpeedRatio.dispose();
+    inst.filterCutoff.dispose();
+    inst.linearSlopeLength.dispose();
+    inst.slopeLinearity.dispose();
+    inst.movementSamplesPerSample.dispose();
+    inst.waveformRenderer.dispose();
+    GranulatorInstancesById.update(map => map.remove(vcId));
   }
 
   mkContainerCleanupHelper()(getGranulatorDOMElementId(vcId));

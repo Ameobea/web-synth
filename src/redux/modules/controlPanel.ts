@@ -333,6 +333,10 @@ const actionGroups = {
   REMOVE_INSTANCE: buildActionGroup({
     actionCreator: (vcId: string) => ({ type: 'REMOVE_INSTANCE', vcId }),
     subReducer: (state: ControlPanelState, { vcId }) => {
+      state.stateByPanelInstance[vcId]?.controls.forEach(conn => {
+        conn.node.stop();
+        conn.node.disconnect();
+      });
       delete state.stateByPanelInstance[vcId];
       return { stateByPanelInstance: { ...state.stateByPanelInstance } };
     },
@@ -405,6 +409,10 @@ const actionGroups = {
       if (removedConns.length !== 1) {
         console.error('Expected to find one conn to remove, found these: ', removedConns);
       }
+      removedConns.forEach(conn => {
+        conn.node.stop();
+        conn.node.disconnect();
+      });
 
       const newInstState = { ...instance, controls: retainedConns };
       setTimeout(() =>
@@ -563,6 +571,11 @@ const actionGroups = {
         console.error(`Tried to load preset named ${name} but it wasn't found`);
         return state;
       }
+
+      instanceState.controls.forEach(conn => {
+        conn.node.stop();
+        conn.node.disconnect();
+      });
 
       return {
         stateByPanelInstance: {

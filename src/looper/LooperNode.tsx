@@ -100,6 +100,14 @@ export class LooperNode {
     }
   }
 
+  public dispose() {
+    this.postMessage({ type: 'shutdown' });
+    this.workletNode?.disconnect();
+    this.workletNode = null;
+    this.midiNodes.forEach(node => node.dispose());
+    this.midiNodes = [];
+  }
+
   public setCompositionForBank(
     moduleIx: number,
     bankIx: number,

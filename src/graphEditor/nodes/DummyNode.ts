@@ -49,4 +49,6 @@ export default class DummyNode extends GainNode implements Pick<MIDINode, keyof 
   }
 
   public disconnect() {}
+
+  public dispose() {}
 }

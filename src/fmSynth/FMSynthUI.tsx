@@ -324,6 +324,23 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     }
   }, [getFMSynthOutput, isHidden, selectedUI?.type]);
 
+  // The effect above only tears the oscilloscope down when `selectedUI.type` changes away from it;
+  // if the component unmounts while it's still selected, the AnalyserNode + its RAF loop leak.
+  useEffect(
+    () => () => {
+      if (wavyJonesInstance.current) {
+        try {
+          wavyJonesInstance.current.disconnect();
+        } catch (_err) {
+          // pass
+        }
+        cancelAnimationFrame(wavyJonesInstance.current.animationFrameHandle);
+        wavyJonesInstance.current = null;
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     const handler = (evt: WheelEvent) => {
       const path = evt.composedPath();

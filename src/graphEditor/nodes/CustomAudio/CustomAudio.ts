@@ -50,7 +50,6 @@ import { TimeConverterNode } from 'src/graphEditor/nodes/CustomAudio/TimeConvert
 import { SmoothNode } from 'src/graphEditor/nodes/CustomAudio/Smooth/SmoothNode';
 import { DetuneNode } from 'src/graphEditor/nodes/CustomAudio/Detune/DetuneNode';
 
-
 export interface ForeignNode<T = any> {
   /**
    * A reference to the `LgNode` that is paired with this `ForeignNode`, if one exists.  This reference should only
@@ -250,6 +249,32 @@ const enhanceAudioNode = <T>({
       }, {});
     }
 
+    public shutdown() {
+      Object.values(this.paramOverrides).forEach(({ param, override }) => {
+        param.dispose();
+        // `override` is the param's externally-owned `manualControl`, so `param.dispose()` won't
+        // stop it — a started source node keeps being processed until stopped, so do it here.
+        try {
+          override.stop();
+        } catch (_err) {
+          // already stopped
+        }
+        override.disconnect();
+      });
+
+      const node = this.node as any;
+      if (typeof node.stop === 'function') {
+        try {
+          node.stop();
+        } catch (_err) {
+          // not started / already stopped
+        }
+      }
+      if (typeof node.disconnect === 'function') {
+        node.disconnect();
+      }
+    }
+
     public renderSmallView: ForeignNode['renderSmallView'] = undefined;
     public cleanupSmallView: ForeignNode['cleanupSmallView'] = undefined;
   };
@@ -418,11 +443,6 @@ export const audioNodeGetters: {
   },
   'customAudio/wavetable': {
     nodeGetter: WaveTable,
-    protoParams: {
-      onRemovedCustom: function () {
-        this.connectables.node.shutdown();
-      },
-    },
   },
   'customAudio/envelopeGenerator': {
     nodeGetter: EnvelopeGenerator,

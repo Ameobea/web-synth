@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 import { Provider } from 'react-redux';
 
@@ -186,6 +186,10 @@ interface SampleRecorderInnerProps {
 const SampleRecorderInner: React.FC<SampleRecorderInnerProps> = ({ awpNode }) => {
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>({ type: 'notStarted' });
   const recordingState = useRef<RecordingState>(buildDefaultRecordingState());
+  useEffect(() => {
+    const state = recordingState.current;
+    return () => state.waveformRenderer.dispose();
+  }, []);
   const settings = useMemo(
     () => getSampleRecorderSettings(recordingStatus, setRecordingStatus, awpNode, recordingState),
     [awpNode, recordingStatus]

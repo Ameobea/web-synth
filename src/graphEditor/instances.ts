@@ -67,6 +67,16 @@ export const setConnectionFlowingStatus = (
 
   const setFlowingCb = () => {
     const nodes = getLGNodesByVcId(vcId);
+    // If the whole graph editor / node went away, `nodes` is empty and the per-node clearing branch
+    // below never runs — clear the interval here so it doesn't tick forever.
+    if (nodes.length === 0) {
+      const intervalHandle = FlowingIntervalHandles.get(vcId);
+      if (!R.isNil(intervalHandle)) {
+        clearInterval(intervalHandle);
+        FlowingIntervalHandles.delete(vcId);
+      }
+      return;
+    }
 
     for (const node of nodes) {
       const outputIx = node?.outputs?.findIndex(R.propEq(outputName, 'name')) ?? -1;

@@ -26,7 +26,11 @@ export const unregisterVcHideCb = (vcId: string, cb: VcHideCb) => {
     return;
   }
   const newCbs = VcHideCbsByVcId.get(vcId)!.filter(ocb => ocb !== cb);
-  VcHideCbsByVcId.set(vcId, newCbs);
+  if (newCbs.length === 0) {
+    VcHideCbsByVcId.delete(vcId);
+  } else {
+    VcHideCbsByVcId.set(vcId, newCbs);
+  }
 };
 
 export const useIsVcHidden = (vcId: string): boolean => {

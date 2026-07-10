@@ -286,5 +286,7 @@ export class SamplerInstance {
       this.awpHandle.port.postMessage({ type: 'shutdown' });
       this.awpHandle.disconnect();
     }
+    this.waveformRenderer.dispose();
+    this.midiNode.dispose();
   }
 }

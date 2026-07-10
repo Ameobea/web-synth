@@ -14,6 +14,7 @@ interface SignalAnalyzerHandle {
   pause: () => void;
   resume: () => void;
   serialize: () => SerializedSignalAnalyzerInst;
+  destroy: () => void;
 }
 
 const SignalAnalyzerInstsByStateKey = new Map<string, SignalAnalyzerHandle>();
@@ -38,6 +39,7 @@ export const init_signal_analyzer = (stateKey: string) => {
       pause: noop,
       resume: noop,
       serialize: () => initialState,
+      destroy: noop,
     });
     return;
   }
@@ -109,6 +111,7 @@ export const persist_signal_analyzer = (stateKey: string) => {
 export const cleanup_signal_analyzer = (stateKey: string) => {
   persist_signal_analyzer(stateKey);
 
+  SignalAnalyzerInstsByStateKey.get(stateKey)?.destroy();
   SignalAnalyzerInstsByStateKey.delete(stateKey);
   mkSvelteContainerCleanupHelper({ preserveRoot: false })(stateKey);
 };

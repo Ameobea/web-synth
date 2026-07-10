@@ -15,6 +15,7 @@ export interface WaveformBounds {
 
 export class WaveformRenderer {
   private worker: Comlink.Remote<WaveformRendererWorker>;
+  private rawWorker: Worker | null = null;
   private sampleCount = 0;
   private bounds: WaveformBounds = { startMs: 0, endMs: 0 };
   private selection: WaveformSelection = {
@@ -63,9 +64,14 @@ export class WaveformRenderer {
   constructor(sample?: AudioBuffer | null) {
     // No waveform will ever be displayed in headless mode, so the render worker is replaced
     // with a no-op stand-in
-    this.worker = (window as any).isHeadless
-      ? (new Proxy({}, { get: () => async () => undefined }) as any)
-      : Comlink.wrap(new Worker(new URL('./WaveformRendererWorker.worker.ts', import.meta.url), { type: 'module' }));
+    if ((window as any).isHeadless) {
+      this.worker = new Proxy({}, { get: () => async () => undefined }) as any;
+    } else {
+      this.rawWorker = new Worker(new URL('./WaveformRendererWorker.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      this.worker = Comlink.wrap(this.rawWorker);
+    }
     if (sample) {
       this.sampleCount = sample.length;
     }
@@ -135,8 +141,9 @@ export class WaveformRenderer {
   }
 
   public setBounds(startMs: number, endMs: number) {
-    if (endMs < startMs) {
+    if (endMs <= startMs) {
       console.error('Invalid bounds provided to waveform renderer: ', { startMs, endMs });
+      return;
     }
     this.bounds = { startMs, endMs };
     this.updateBoundsCbs();
@@ -212,5 +219,13 @@ export class WaveformRenderer {
         console.error('Unhandled event type in waveformrenderer: ', type);
       }
     }
+  }
+
+  public dispose() {
+    this.canvasCtx = null;
+    this.boundsChangedCbs = [];
+    this.selectionChangedCbs = [];
+    this.rawWorker?.terminate();
+    this.rawWorker = null;
   }
 }

@@ -391,6 +391,19 @@ export const cleanup_sequencer = (stateKey: string) => {
 
   localStorage.setItem(stateKey, serialized);
 
+  const seqState = reduxInfra.getState().sequencer;
+  seqState.gateOutputs.forEach(csn => {
+    csn.stop();
+    csn.disconnect();
+  });
+  seqState.midiOutputs.forEach(node => node.dispose());
+  seqState.outputGainNode.disconnect();
+  if (seqState.awpHandle) {
+    seqState.awpHandle.port.postMessage({ type: 'shutdown' });
+    seqState.awpHandle.disconnect();
+  }
+  SequencerInstancesMap.delete(vcId);
+
   mkContainerCleanupHelper()(getSequencerDOMElementId(vcId));
 };
 

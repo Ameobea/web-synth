@@ -23,12 +23,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
         automationRate: 'k-rate',
       },
       {
-        name: 'voice_1_samples_between_grains',
-        defaultValue: 0,
-        automationRate: 'k-rate',
-      },
-      {
-        name: 'voice_2_samples_between_grains',
+        name: 'samples_between_grains',
         defaultValue: 0,
         automationRate: 'k-rate',
       },
@@ -38,12 +33,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
         automationRate: 'k-rate',
       },
       {
-        name: 'voice_1_filter_cutoff',
-        defaultValue: 0,
-        automationRate: 'k-rate',
-      },
-      {
-        name: 'voice_2_filter_cutoff',
+        name: 'filter_cutoff',
         defaultValue: 0,
         automationRate: 'k-rate',
       },
@@ -62,13 +52,7 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
         automationRate: 'k-rate',
       },
       {
-        name: 'voice_1_movement_samples_per_sample',
-        defaultValue: 0,
-        minValue: 0,
-        automationRate: 'k-rate',
-      },
-      {
-        name: 'voice_2_movement_samples_per_sample',
+        name: 'movement_samples_per_sample',
         defaultValue: 0,
         minValue: 0,
         automationRate: 'k-rate',
@@ -100,7 +84,12 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
   }
 
   initGranularCtx() {
-    this.granularInstCtxPtr = this.wasmInstance.exports.create_granular_instance();
+    // Reuse the existing context across sample changes; creating a new one each time leaked the old
+    // context and its entire waveform buffer.  `get_granular_waveform_ptr` reallocates the waveform,
+    // so a fresh context is only needed the first time.
+    if (!this.granularInstCtxPtr) {
+      this.granularInstCtxPtr = this.wasmInstance.exports.create_granular_instance();
+    }
     const waveformPtr = this.wasmInstance.exports.get_granular_waveform_ptr(
       this.granularInstCtxPtr,
       this.samples.length
@@ -281,15 +270,12 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
     }
 
     const grainSize = params['grain_size'][0];
-    const voice1SamplesBetweenGrains = params['voice_1_samples_between_grains'][0];
-    const voice2SamplesBetweenGrains = params['voice_2_samples_between_grains'][0];
+    const samplesBetweenGrains = params['samples_between_grains'][0];
     const sampleSpeedRatio = params['sample_speed_ratio'][0];
-    const voice1FilterCutoff = params['voice_1_filter_cutoff'][0];
-    const voice2FilterCutoff = params['voice_2_filter_cutoff'][0];
+    const filterCutoff = params['filter_cutoff'][0];
     const linearSlopeLength = params['linear_slope_length'][0];
     const slopeLinearity = params['slope_linearity'][0];
-    const voice1MovementSamplesPerSample = params['voice_1_movement_samples_per_sample'][0];
-    const voice2MovementSamplesPerSample = params['voice_2_movement_samples_per_sample'][0];
+    const movementSamplesPerSample = params['movement_samples_per_sample'][0];
 
     // Render
     const outputBufPtr = this.wasmInstance.exports.render_granular(
@@ -297,24 +283,18 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
       selectionStartSampleIx,
       selectionEndSampleIx,
       grainSize,
-      voice1FilterCutoff,
-      voice2FilterCutoff,
+      filterCutoff,
       linearSlopeLength,
       slopeLinearity,
-      voice1MovementSamplesPerSample,
-      voice2MovementSamplesPerSample,
+      movementSamplesPerSample,
       sampleSpeedRatio,
-      sampleSpeedRatio, // TODO: separate per voice
-      voice1SamplesBetweenGrains,
-      voice2SamplesBetweenGrains
+      samplesBetweenGrains
     );
 
     // Fill the first output buffer and then copy them to all other outputs
     const dstBuffer = outputs[0][0];
-    const output = new Float32Array(this.wasmInstance.exports.memory.buffer).subarray(
-      outputBufPtr / BYTES_PER_F32,
-      outputBufPtr / BYTES_PER_F32 + FRAME_SIZE
-    );
+    const outStartIx = outputBufPtr / BYTES_PER_F32;
+    const output = this.getWasmMemory().subarray(outStartIx, outStartIx + FRAME_SIZE);
     dstBuffer.set(output);
 
     for (let outputIx = 0; outputIx < outputs.length; outputIx++) {

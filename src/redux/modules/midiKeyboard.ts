@@ -363,6 +363,11 @@ const actionGroups = {
     }),
     subReducer: (state: MidiKeyboardState, { stateKey, outputIx }) => {
       const ctx = getMidiKeyboardCtx(stateKey);
+      const removed = ctx.mappedOutputs[outputIx];
+      if (removed) {
+        removed.csn.stop();
+        removed.csn.disconnect();
+      }
       ctx.mappedOutputs = R.remove(outputIx, 1, ctx.mappedOutputs);
 
       setTimeout(() =>

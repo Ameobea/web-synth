@@ -6,6 +6,7 @@ import React, { Suspense } from 'react';
 import {
   connectFilterChain,
   deserializeFilterDesigner,
+  disposeFilterDescriptor,
   type FilterDesignerState,
   serializeFilterDesigner,
   setFilter,
@@ -132,8 +133,13 @@ export const cleanup_filter_designer = (stateKey: string) => {
   } else {
     const serialized = serializeFilterDesigner(state);
     localStorage.setItem(stateKey, serialized);
+    state.filterGroups.forEach(group => group.forEach(disposeFilterDescriptor));
+    state.input.disconnect();
     StatesByVcId.delete(vcId);
   }
+  // The `FilterDesigner` d3 class lives in the lazily-loaded component module (already loaded by
+  // now); import dynamically so we don't pull d3 into the main bundle just for cleanup.
+  void import('./FilterDesigner').then(m => m.cleanupFilterDesignerInst(vcId));
 
   mkContainerCleanupHelper()(getFilterDesignerDOMElementId(vcId));
 };

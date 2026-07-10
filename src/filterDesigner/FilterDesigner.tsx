@@ -9,6 +9,7 @@ import {
   connectFilterChain,
   deserializeFilterDesigner,
   disconnectFilterChain,
+  disposeFilterDescriptor,
   setFilter,
   type FilterDescriptor,
   type FilterDesignerState,
@@ -284,6 +285,10 @@ class FilterDesigner {
 
 const StateByVcId: Map<string, FilterDesigner> = new Map();
 
+export const cleanupFilterDesignerInst = (vcId: string) => {
+  StateByVcId.delete(vcId);
+};
+
 interface ConfigureFilterGroupProps {
   state: FilterDesignerState;
   setState: React.Dispatch<React.SetStateAction<FilterDesignerState>>;
@@ -315,6 +320,7 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
           }
 
           disconnectFilterChain(group.map(g => g.filter));
+          group.forEach(disposeFilterDescriptor);
           const newState = {
             ...state,
             filterGroups: state.filterGroups.filter((_, ix) => ix !== groupIx),
@@ -324,6 +330,7 @@ const ConfigureFilterGroup: React.FC<ConfigureFilterGroupProps> = ({
         }
 
         disconnectFilterChain(group.map(g => g.filter));
+        disposeFilterDescriptor(group[filterIx]);
         const newState = {
           ...state,
           filterGroups: R.set(
@@ -477,7 +484,10 @@ const FilterDesignerUI: React.FC<FilterDesignerUIProps> = ({
         label: 'load preset',
         action: () => {
           setState(state => {
-            state.filterGroups.forEach(group => disconnectFilterChain(group.map(g => g.filter)));
+            state.filterGroups.forEach(group => {
+              disconnectFilterChain(group.map(g => g.filter));
+              group.forEach(disposeFilterDescriptor);
+            });
             const { preset } = Presets.find(R.propEq(selectedPresetName, 'name'))!;
             const newState = deserializeFilterDesigner(preset);
             updateConnectables?.(newState);

@@ -58,6 +58,7 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
     scaler_functions: SettingDefinition[];
   } | null>(null);
   const [ctxPtr, setCtxPtr] = useState<number | null>(null);
+  const ctxPtrRef = useRef<number | null>(null);
   const spectrumModule = useRef<typeof import('src/spectrum_viz') | null>(null);
   const [canvasRef, setCanvasRef] = useState<null | HTMLCanvasElement>(null);
   const [mkUpdateViz, setMkUpdateViz] = useState<
@@ -88,6 +89,20 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
     }
   }, [mkUpdateViz, canvasRef, paused]);
 
+  useEffect(
+    () => () => {
+      if (animationFrameHandle.current !== null) {
+        cancelAnimationFrame(animationFrameHandle.current);
+        animationFrameHandle.current = null;
+      }
+      if (ctxPtrRef.current !== null) {
+        spectrumModule.current?.drop_context(ctxPtrRef.current);
+        ctxPtrRef.current = null;
+      }
+    },
+    []
+  );
+
   const didInit = useRef(false);
   useEffect(() => {
     if (didInit.current) {
@@ -112,6 +127,7 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
       if (initialConf) {
         spectrumModule.current!.set_conf(ctxPtr, initialConf.color_fn, initialConf.scaler_fn);
       }
+      ctxPtrRef.current = ctxPtr;
       setCtxPtr(ctxPtr);
 
       let curIx = 0;

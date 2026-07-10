@@ -157,6 +157,9 @@ const looperSlice = createSlice({
     ) => {
       state.stateByVcId[action.payload.vcId] = action.payload.state;
     },
+    removeLooperInstState: (state, action: PayloadAction<{ vcId: string }>) => {
+      delete state.stateByVcId[action.payload.vcId];
+    },
     addBank: (state, action: PayloadAction<{ vcId: string; moduleIx: number }>) => {
       const modulestate = state.stateByVcId[action.payload.vcId].modules[action.payload.moduleIx];
       modulestate.banks.push(buildDefaultLooperBank());

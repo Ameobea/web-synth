@@ -18,6 +18,12 @@ export interface FilterDescriptor {
 }
 export type FilterGroup = FilterDescriptor[];
 
+export const disposeFilterDescriptor = (filter: FilterDescriptor) => {
+  filter.oaps.frequency.dispose();
+  filter.oaps.Q.dispose();
+  filter.oaps.gain.dispose();
+};
+
 export interface FilterDesignerState {
   input: GainNode;
   filterGroups: FilterGroup[];

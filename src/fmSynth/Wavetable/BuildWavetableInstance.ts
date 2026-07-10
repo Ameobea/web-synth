@@ -456,5 +456,6 @@ export class BuildWavetableInstance {
     this.wavetable.shutdown();
     this.gainNode.disconnect();
     this.frequencyCSN.disconnect();
+    this.wavetablePositionCSN.disconnect();
   }
 }

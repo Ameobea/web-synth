@@ -91,6 +91,7 @@ export class EqualizerInstance {
   public awpHandle: AudioWorkletNode | DummyNode;
   private analyzerNode: AnalyserNode;
   private worker: Comlink.Remote<EqualizerWorker>;
+  private rawWorker: Worker | null = null;
   private workerReadyP!: Promise<void>;
   private ready = false;
   /**
@@ -119,9 +120,14 @@ export class EqualizerInstance {
     this.uiState = uiState;
     const isHeadless = !!(window as any).isHeadless;
     this.awpHandle = new DummyNode('equalizer');
-    this.worker = isHeadless
-      ? makeNoopEqWorker()
-      : Comlink.wrap(new Worker(new URL('./equalizerWorker.worker.ts', import.meta.url), { type: 'module' }));
+    if (isHeadless) {
+      this.worker = makeNoopEqWorker();
+    } else {
+      this.rawWorker = new Worker(new URL('./equalizerWorker.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      this.worker = Comlink.wrap(this.rawWorker);
+    }
     this.analyzerNode = ctx.createAnalyser();
     this.analyzerNode.fftSize = LineSpectrogramFFTSize;
     this.analyzerNode.minDecibels = initialState.lineSpectrogramUIState.rangeDb[0];
@@ -548,7 +554,23 @@ export class EqualizerInstance {
   public shutdown() {
     if (this.awpHandle instanceof AudioWorkletNode) {
       this.awpHandle.port.postMessage({ type: 'shutdown' });
+      this.awpHandle.disconnect();
     }
     this.unsubscribeUIState();
+    if (this.responseAnimationFrameHandle !== null) {
+      cancelAnimationFrame(this.responseAnimationFrameHandle);
+      this.responseAnimationFrameHandle = null;
+    }
+    this.lineSpectrogram?.stop();
+    this.lineSpectrogram?.destroy();
+    this.analyzerNode.disconnect();
+    this.bandOANs.forEach(band => {
+      band.freq.dispose();
+      band.q.dispose();
+      band.gain.dispose();
+    });
+    this.bandOANs = [];
+    this.rawWorker?.terminate();
+    this.rawWorker = null;
   }
 }

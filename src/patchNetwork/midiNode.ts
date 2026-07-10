@@ -8,6 +8,7 @@ import {
   registerGlobalStopCB,
   scheduleEventBeats,
   scheduleMIDIEventBeats,
+  unregisterStopCB,
   type EventToReschedule,
 } from 'src/eventScheduler';
 import { UnimplementedError, UnreachableError } from 'src/util';
@@ -66,6 +67,7 @@ export class MIDINode {
   public metadata: Writable<MIDINodeMetadata> = writable({ noteMetadata: new Map() });
   private cachedInputCbs: MIDIInputCbs | null = null;
   private connectionsChangedCbs: (() => void)[] = [];
+  private stopCb: () => void;
 
   constructor(getInputCbs?: (() => MIDIInputCbs) | undefined) {
     this.getInputCbs =
@@ -74,9 +76,18 @@ export class MIDINode {
         throw new UnreachableError("MIDI node doesn't accept inputs");
       });
 
-    registerGlobalStopCB(() => {
+    this.stopCb = () => {
       this.scheduledEvents.length = 0;
-    });
+    };
+    registerGlobalStopCB(this.stopCb);
+  }
+
+  /**
+   * Releases the global stop callback registered in the constructor.  Call when discarding a
+   * `MIDINode`; otherwise it (and everything it closes over) leaks for the session lifetime.
+   */
+  public dispose() {
+    unregisterStopCB(this.stopCb);
   }
 
   /**

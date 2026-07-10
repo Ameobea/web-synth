@@ -10,7 +10,7 @@
 
 <script lang="ts">
   import * as Comlink from 'comlink';
-  import { untrack } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
 
   import {
     getWavetablePreset,
@@ -37,9 +37,12 @@
 
   let { onSubmit, onCancel, curPreset = undefined }: Props = $props();
 
-  const worker: Comlink.Remote<WavetableConfiguratorWorker> = Comlink.wrap(
-    new Worker(new URL('./WavetableConfiguratorWorker.worker.ts', import.meta.url), { type: 'module' })
+  const rawWorker = new Worker(
+    new URL('./WavetableConfiguratorWorker.worker.ts', import.meta.url),
+    { type: 'module' }
   );
+  const worker: Comlink.Remote<WavetableConfiguratorWorker> = Comlink.wrap(rawWorker);
+  onDestroy(() => rawWorker.terminate());
 
   let route: Route = $state(
     untrack(() => (curPreset ? Route.BuildWavetable : Route.BrowseWavetables))

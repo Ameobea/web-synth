@@ -6,12 +6,14 @@ import type { AudioConnectables, ConnectableInput, ConnectableOutput } from 'src
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import buildSynthDesignerRedux, {
   deserializeSynthModule,
+  disposeSynthModule,
   getInitialSynthDesignerState,
   getSynthDesignerReduxInfra,
   serializeSynthModule,
   SynthDesignerStateByStateKey,
   type SynthDesignerState,
 } from 'src/redux/modules/synthDesigner';
+import type { WavyJones } from 'src/visualizations/WavyJones';
 import { UnreachableError } from 'src/util';
 
 export type SynthDesignerReduxInfra = ReturnType<typeof buildSynthDesignerRedux>;
@@ -192,9 +194,17 @@ export const cleanup_synth_designer = (stateKey: string): string => {
       state.reactRoot.unmount();
     }
 
-    state.getState().synthDesigner.synths.forEach(synth => synth.fmSynth.shutdown());
+    const synthState = state.getState().synthDesigner;
+    synthState.synths.forEach(disposeSynthModule);
+    if (synthState.wavyJonesInstance) {
+      synthState.wavyJonesInstance.disconnect();
+      cancelAnimationFrame((synthState.wavyJonesInstance as WavyJones).animationFrameHandle);
+    }
+    synthState.spectrumNode.disconnect();
+    state.midiNode.dispose();
   }
 
+  SynthDesignerStateByStateKey.delete(stateKey);
   document.getElementById(getRootNodeId(vcId))?.remove();
   return designerState;
 };

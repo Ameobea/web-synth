@@ -103,6 +103,8 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
    * node itself is passed through to `wrappedParam`.
    */
   private isOverridden: boolean;
+  private ownsManualControl = true;
+  private disposed = false;
 
   constructor(
     ctx: AudioContext,
@@ -117,6 +119,7 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
     this.ctx = ctx;
 
     this.wrappedParam = wrappedParam || this.buildWrappedParam();
+    this.ownsManualControl = !manualControl;
     this.manualControl = manualControl || buildManualControl(ctx);
 
     this.isOverridden = defaultOverridden;
@@ -193,11 +196,23 @@ export class OverridableAudioParam extends GainNode implements AudioNode {
   }
 
   public dispose() {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+
     this.disconnect();
     if (this.isOverridden) {
       tryDisconnect(this.manualControl, this.wrappedParam);
     }
+    // A started `AudioScheduledSourceNode` is kept alive and processed by the browser until it is
+    // stopped, regardless of whether it's connected — so disconnecting alone leaks it.
+    if (this.ownsManualControl) {
+      this.manualControl.stop();
+      this.manualControl.disconnect();
+    }
     if (this.outputCSN) {
+      this.outputCSN.stop();
       this.outputCSN.disconnect();
     }
   }
@@ -211,10 +226,13 @@ export class OverridableAudioNode extends GainNode {
   public manualControl: ConstantSourceNode;
   private isOverridden: boolean;
   public output: GainNode;
+  private ownsManualControl = true;
+  private disposed = false;
 
   constructor(ctx: AudioContext, manualControl?: ConstantSourceNode, defaultOverridden = true) {
     super(ctx);
 
+    this.ownsManualControl = !manualControl;
     this.manualControl = manualControl || buildManualControl(ctx);
     this.isOverridden = defaultOverridden;
     this.output = new GainNode(ctx);
@@ -257,5 +275,19 @@ export class OverridableAudioNode extends GainNode {
 
   public deregisterOverrideStatusChangeCb(cb: (isOverridden: boolean) => void) {
     this.overrideStatusChangeCbs = this.overrideStatusChangeCbs.filter(c => c !== cb);
+  }
+
+  public dispose() {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+
+    this.disconnect();
+    this.output.disconnect();
+    if (this.ownsManualControl) {
+      this.manualControl.stop();
+      this.manualControl.disconnect();
+    }
   }
 }

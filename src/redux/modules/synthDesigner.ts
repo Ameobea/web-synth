@@ -85,7 +85,7 @@ const connectOscillators = (connect: boolean, synth: SynthModule) => {
   }
 };
 
-const disposeSynthModule = (synth: SynthModule) => {
+export const disposeSynthModule = (synth: SynthModule) => {
   synth.fmSynth.shutdown();
   synth.outerGainNode.disconnect();
   if (synth.filterOverrideStatusChangeCbs) {
@@ -99,6 +99,9 @@ const disposeSynthModule = (synth: SynthModule) => {
       synth.filterOverrideStatusChangeCbs.handleGainOverrideStatusChange
     );
   }
+  synth.filterCSNs.frequency.dispose();
+  synth.filterCSNs.Q.dispose();
+  synth.filterCSNs.gain.dispose();
 };
 
 const connectFMSynth = (stateKey: string, synthIx: number) => {

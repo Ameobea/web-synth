@@ -92,6 +92,7 @@ const registerCustomAudioNode = (
 
   CustomAudioNode.prototype.onRemoved = function (this: any) {
     this.onRemovedCustom?.();
+    this.connectables?.node?.shutdown?.();
   };
 
   // Whenever any of the properties of the LG node are changed, they trigger the value of the underlying

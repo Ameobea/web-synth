@@ -80,7 +80,7 @@ export class MixerNode implements ForeignNode {
 
     const removedGain = this.gainNodes.pop()!;
     const removedParam = this.gainParams.pop();
-    removedParam?.output.disconnect();
+    removedParam?.dispose();
     // Don't disconnect any incoming connections to this input; those will be trimmed by the graph diffing.
     // Only disconnect the internal connection.
     removedGain.disconnect(this.outputNode);
@@ -116,6 +116,12 @@ export class MixerNode implements ForeignNode {
 
   public renderSmallView: ForeignNode['renderSmallView'];
   public cleanupSmallView: ForeignNode['cleanupSmallView'];
+
+  public shutdown() {
+    this.gainParams.forEach(param => param.dispose());
+    this.gainNodes.forEach(gain => gain.disconnect());
+    this.outputNode.disconnect();
+  }
 
   public serialize() {
     return {

@@ -95,6 +95,7 @@ export const cleanup_equalizer = (stateKey: string) => {
   localStorage.setItem(stateKey, JSON.stringify(serialized));
 
   ctx.inst.shutdown();
+  EqualizerCtxById.delete(vcId);
 
   mkSvelteContainerCleanupHelper()(getEqualizerDOMElementId(vcId));
 };

@@ -14,15 +14,12 @@ import { useMappedWritableValue } from 'src/reactUtils';
 
 export interface GranulatorControlPanelState {
   grain_size: number;
-  voice_1_samples_between_grains: number;
-  voice_2_samples_between_grains: number;
+  samples_between_grains: number;
   sample_speed_ratio: number;
-  voice_1_filter_cutoff: number;
-  voice_2_filter_cutoff: number;
+  filter_cutoff: number;
   linear_slope_length: number;
   slope_linearity: number;
-  voice_1_movement_samples_per_sample: number;
-  voice_2_movement_samples_per_sample: number;
+  movement_samples_per_sample: number;
 }
 
 const GRANULATOR_CONTROL_PANEL_STYLE = { marginTop: 20, width: 800 };
@@ -44,24 +41,16 @@ const GranularControlPanel: React.FC<GranularControlPanelProps> = ({ initialStat
           inst.grainSize.manualControl.offset.value = value;
           break;
         }
-        case 'voice_1_samples_between_grains': {
-          inst.voice1SamplesBetweenGrains.manualControl.offset.value = value;
-          break;
-        }
-        case 'voice_2_samples_between_grains': {
-          inst.voice2SamplesBetweenGrains.manualControl.offset.value = value;
+        case 'samples_between_grains': {
+          inst.samplesBetweenGrains.manualControl.offset.value = value;
           break;
         }
         case 'sample_speed_ratio': {
           inst.sampleSpeedRatio.manualControl.offset.value = value;
           break;
         }
-        case 'voice_1_filter_cutoff': {
-          inst.voice1FilterCutoff.manualControl.offset.value = value;
-          break;
-        }
-        case 'voice_2_filter_cutoff': {
-          inst.voice2FilterCutoff.manualControl.offset.value = value;
+        case 'filter_cutoff': {
+          inst.filterCutoff.manualControl.offset.value = value;
           break;
         }
         case 'linear_slope_length': {
@@ -72,12 +61,8 @@ const GranularControlPanel: React.FC<GranularControlPanelProps> = ({ initialStat
           inst.slopeLinearity.manualControl.offset.value = value;
           break;
         }
-        case 'voice_1_movement_samples_per_sample': {
-          inst.voice1MovementSamplesPerSample.manualControl.offset.value = value;
-          break;
-        }
-        case 'voice_2_movement_samples_per_sample': {
-          inst.voice2MovementSamplesPerSample.manualControl.offset.value = value;
+        case 'movement_samples_per_sample': {
+          inst.movementSamplesPerSample.manualControl.offset.value = value;
           break;
         }
         default: {
@@ -104,20 +89,12 @@ const GranularControlPanel: React.FC<GranularControlPanelProps> = ({ initialStat
         initial: initialState.grain_size,
       },
       {
-        label: 'voice_1_samples_between_grains',
+        label: 'samples_between_grains',
         type: 'range',
         min: 1,
         max: 20_000,
         scale: 'log',
-        initial: initialState.voice_1_samples_between_grains,
-      },
-      {
-        label: 'voice_2_samples_between_grains',
-        type: 'range',
-        min: 1,
-        max: 20_000,
-        scale: 'log',
-        initial: initialState.voice_2_samples_between_grains,
+        initial: initialState.samples_between_grains,
       },
       {
         label: 'sample_speed_ratio',
@@ -128,19 +105,11 @@ const GranularControlPanel: React.FC<GranularControlPanelProps> = ({ initialStat
         initial: initialState.sample_speed_ratio,
       },
       {
-        label: 'voice_1_filter_cutoff',
+        label: 'filter_cutoff',
         type: 'range',
         min: -4000,
         max: 4000,
-        initial: initialState.voice_1_filter_cutoff,
-        step: 10,
-      },
-      {
-        label: 'voice_2_filter_cutoff',
-        type: 'range',
-        min: -4000,
-        max: 4000,
-        initial: initialState.voice_2_filter_cutoff,
+        initial: initialState.filter_cutoff,
         step: 10,
       },
       {
@@ -160,18 +129,11 @@ const GranularControlPanel: React.FC<GranularControlPanelProps> = ({ initialStat
         step: 0.01,
       },
       {
-        label: 'voice_1_movement_samples_per_sample',
+        label: 'movement_samples_per_sample',
         type: 'range',
         min: 0.0,
         max: 4,
-        initial: initialState.voice_1_movement_samples_per_sample,
-      },
-      {
-        label: 'voice_2_movement_samples_per_sample',
-        type: 'range',
-        min: 0.0,
-        max: 4,
-        initial: initialState.voice_2_movement_samples_per_sample,
+        initial: initialState.movement_samples_per_sample,
       },
     ],
     [initialState]
@@ -181,7 +143,6 @@ const GranularControlPanel: React.FC<GranularControlPanelProps> = ({ initialStat
     <ControlPanel style={GRANULATOR_CONTROL_PANEL_STYLE} settings={settings} onChange={onChange} />
   );
 };
-
 
 const msToSamples = (ms: number | null, sampleRate: number): number | null => {
   if (ms === null) {
@@ -258,7 +219,10 @@ const GranulatorUI: React.FC<GranulatorUIProps> = ({
           ? null
           : (endMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000,
     });
-  }, [activeSample?.sampleData.sampleRate, inst, vcId, waveformRenderer]);
+    // Keyed on `activeSample` (not just its sample rate) so the renderer's selection is restored
+    // from the persisted params on every sample change — otherwise switching between two samples
+    // with the same rate leaves the renderer's selection out of sync with the overlay and engine.
+  }, [activeSample, inst, vcId, waveformRenderer]);
 
   useEffect(() => {
     const waveformRendererInst = waveformRenderer;

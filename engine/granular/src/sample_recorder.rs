@@ -20,11 +20,10 @@ pub unsafe extern "C" fn sample_recorder_record(
   sample_count_to_write: usize,
 ) -> *mut f32 {
   let ctx = &mut *ctx;
+  let old_len = ctx.samples.len();
   ctx.samples.reserve(sample_count_to_write);
-  ctx
-    .samples
-    .set_len(ctx.samples.len() + sample_count_to_write);
-  ctx.samples.as_mut_ptr().add(ctx.samples.len())
+  ctx.samples.set_len(old_len + sample_count_to_write);
+  ctx.samples.as_mut_ptr().add(old_len)
 }
 
 /// Returns a pointer to the sample buffer for the provided context with an offset of `offset`

@@ -171,7 +171,6 @@ export const MidiKeyboard: React.FC<MidiKeyboardProps> = ({
           evt.stopPropagation();
           return false;
         }}
-        ref={elem => elem?.addEventListener('selectionchange', console.log)}
       >
         <Piano
           noteRange={{

@@ -128,6 +128,20 @@ export class MIDIInput {
     return { inputName: this.selectedInputName };
   }
 
+  public destroy() {
+    this.pitchBendNode.stop();
+    this.pitchBendNode.disconnect();
+    this.modWheelNode.stop();
+    this.modWheelNode.disconnect();
+    if (this.wasmMidiCtxPtr && this.midiModule) {
+      this.midiModule.drop_msg_handler_ctx(this.wasmMidiCtxPtr);
+      this.wasmMidiCtxPtr = 0;
+      if (this.midiInput && this.midiMsgHandlerCb) {
+        this.midiInput.removeEventListener('midimessage', this.midiMsgHandlerCb);
+      }
+    }
+  }
+
   public handleSelectedInputName(newInputName: string | undefined) {
     if (this.selectedInputName === newInputName) {
       return;

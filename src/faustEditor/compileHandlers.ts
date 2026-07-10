@@ -148,5 +148,6 @@ export const mkStopInstanceHandler = (vcId: string) => () => {
 
   // Create new audio connectables using a passthrough node
   updateConnectables(vcId, get_faust_editor_connectables(vcId));
+  Object.values(context.overrideableParams).forEach(param => param.dispose());
   context.overrideableParams = {};
 };

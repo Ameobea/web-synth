@@ -100,9 +100,11 @@ export const cleanup_looper = (stateKey: string) => {
     } else {
       const serialized = serializeLooper(looperInstState);
       localStorage.setItem(stateKey, serialized);
+      looperInstState.looperNode.dispose();
     }
 
     LooperCtxsByVcId.delete(vcId);
+    looperDispatch(looperActions.removeLooperInstState({ vcId }));
   }
 
   mkContainerCleanupHelper()(getLooperDOMElementId(vcId));

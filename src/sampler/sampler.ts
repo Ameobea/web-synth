@@ -115,6 +115,7 @@ export const cleanup_sampler = (stateKey: string) => {
   localStorage.setItem(stateKey, JSON.stringify(serialized));
 
   inst.shutdown();
+  SamplerInstancesById.delete(vcId);
 
   mkSvelteContainerCleanupHelper()(getSamplerDOMElementId(vcId));
 };

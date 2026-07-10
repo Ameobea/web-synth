@@ -251,6 +251,7 @@ const actionGroups = {
 
       removed.disconnect();
       removed.inputCbs.onClearAll();
+      removed.dispose();
 
       return {
         ...state,

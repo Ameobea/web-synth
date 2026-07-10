@@ -121,7 +121,9 @@ impl Grain {
     };
 
     let gain = Self::get_volume(pos_in_grain, linear_slope_length, slope_linearity);
-    let sample = read_interpolated(buf, self.start_sample_ix + sample_ix);
+    // `read_interpolated` reads `buf[ix]` and `buf[ix + 1]`, so the max safe index is `len - 2`.
+    let read_ix = clamp(0., buf.len() as f32 - 2., self.start_sample_ix + sample_ix);
+    let sample = read_interpolated(buf, read_ix);
     (gain, sample)
   }
 }
@@ -131,7 +133,7 @@ pub struct GranularCtx {
   /// The offset from `cur_grain_start` at which the latest sample will be read
   pub cur_sample_offset: f32,
   pub rendered_output: [f32; FRAME_SIZE],
-  pub voices: [GranularVoice; 2],
+  pub voice: GranularVoice,
   pub last_start_sample_ix: f32,
   pub last_end_sample_ix: f32,
   pub last_grain_size: f32,
@@ -143,7 +145,7 @@ impl Default for GranularCtx {
       waveform: Vec::new(),
       cur_sample_offset: 0.0,
       rendered_output: [0.0; FRAME_SIZE],
-      voices: [GranularVoice::default(), GranularVoice::default()],
+      voice: GranularVoice::default(),
       last_start_sample_ix: -10.0,
       last_end_sample_ix: -10.0,
       last_grain_size: 800.,
@@ -180,13 +182,17 @@ impl GranularVoice {
     self.cur_grain_start += movement_samples_per_sample;
 
     if self.cur_grain_start + grain_size > selection_end_sample_ix {
-      // Grain would overflow the selection; we need to wrap it back around to the start of
-      // the selection
-      let selection_len = selection_end_sample_ix - selection_start_sample_ix;
-      let offset_from_selection_start = self.cur_grain_start - selection_start_sample_ix;
-      let new_offset_from_selection_start =
-        offset_from_selection_start % (selection_len - grain_size);
-      self.cur_grain_start = new_offset_from_selection_start + selection_start_sample_ix;
+      // Grain would overflow the selection; wrap it back around to the start.  When the grain is
+      // as large as (or larger than) the selection there's no room to move, so pin to the start;
+      // otherwise `% wrap_range` would be a modulo by zero/negative and poison the read head with
+      // NaN forever.
+      let wrap_range = (selection_end_sample_ix - selection_start_sample_ix) - grain_size;
+      self.cur_grain_start = if wrap_range <= 0. {
+        selection_start_sample_ix
+      } else {
+        selection_start_sample_ix
+          + (self.cur_grain_start - selection_start_sample_ix).rem_euclid(wrap_range)
+      };
     }
   }
 
@@ -277,7 +283,7 @@ impl GranularVoice {
     selection_start_sample_ix: f32,
     selection_end_sample_ix: f32,
     grain_size: f32,
-    // Positive values are highpass, negative values are lowpass
+    // Positive values are lowpass, negative values are highpass
     filter_cutoff: f32,
     linear_slope_length: f32,
     slope_linearity: f32,
@@ -327,8 +333,9 @@ impl GranularVoice {
       return sample;
     }
 
-    // Apply filter
-    if filter_cutoff > 0. {
+    // Apply filter.  Branch on the smoothed cutoff (not the raw target) so a sweep across zero
+    // never feeds a negative frequency into the wrong filter mode.
+    if self.filter_cutoff > 0. {
       self.filter.lowpass(self.filter_cutoff, sample)
     } else {
       self.filter.highpass(-self.filter_cutoff, sample)
@@ -344,46 +351,26 @@ impl GranularCtx {
     grain_size: f32,
     linear_slope_length: f32,
     slope_linearity: f32,
-    voice_1_filter_cutoff: f32,
-    voice_2_filter_cutoff: f32,
-    voice_1_samples_between_grains: f32,
-    voice_2_samples_between_grains: f32,
-    voice_1_gain: f32,
-    voice_2_gain: f32,
-    voice_1_movement_samples_per_sample: f32,
-    voice_2_movement_samples_per_sample: f32,
-    voice_1_sample_speed_ratio: f32,
-    voice_2_sample_speed_ratio: f32,
-    voice_1_grain_start_randomness_samples: f32,
-    voice_2_grain_start_randomness_samples: f32,
+    filter_cutoff: f32,
+    samples_between_grains: f32,
+    movement_samples_per_sample: f32,
+    sample_speed_ratio: f32,
+    grain_start_randomness_samples: f32,
   ) -> f32 {
-    let v1_sample = self.voices[0].update_and_get_sample(
+    let sample = self.voice.update_and_get_sample(
       &self.waveform,
       selection_start_sample_ix,
       selection_end_sample_ix,
       grain_size,
-      voice_1_filter_cutoff,
+      filter_cutoff,
       linear_slope_length,
       slope_linearity,
-      voice_1_samples_between_grains,
-      voice_1_movement_samples_per_sample,
-      voice_1_sample_speed_ratio,
-      voice_1_grain_start_randomness_samples,
+      samples_between_grains,
+      movement_samples_per_sample,
+      sample_speed_ratio,
+      grain_start_randomness_samples,
     );
-    let v2_sample = self.voices[1].update_and_get_sample(
-      &self.waveform,
-      selection_start_sample_ix,
-      selection_end_sample_ix,
-      grain_size,
-      voice_2_filter_cutoff,
-      linear_slope_length,
-      slope_linearity,
-      voice_2_samples_between_grains,
-      voice_2_movement_samples_per_sample,
-      voice_2_sample_speed_ratio,
-      voice_2_grain_start_randomness_samples,
-    );
-    (v1_sample * 0.5 * voice_1_gain) + (v2_sample * 0.5 * voice_2_gain)
+    sample * 0.5
   }
 }
 
@@ -404,29 +391,18 @@ pub fn get_granular_waveform_ptr(ctx: *mut GranularCtx, new_waveform_len: usize)
   }
 }
 
-// #[no_mangle]
-// pub fn set_is_reversed(ctx: *mut GranularCtx, voice_ix: usize, is_reversed: bool) {
-//     unsafe {
-//         (*ctx).voices[voice_ix].reversed.is_reversed = is_reversed;
-//     }
-// }
-
 #[no_mangle]
 pub fn render_granular(
   ctx: *mut GranularCtx,
   selection_start_sample_ix: f32,
   selection_end_sample_ix: f32,
   grain_size: f32,
-  voice_1_filter_cutoff: f32,
-  voice_2_filter_cutoff: f32,
+  filter_cutoff: f32,
   linear_slope_length: f32,
   slope_linearity: f32,
-  voice_1_movement_samples_per_sample: f32,
-  voice_2_movement_samples_per_sample: f32,
-  voice_1_sample_speed_ratio: f32,
-  voice_2_sample_speed_ratio: f32,
-  voice_1_samples_between_grains: f32,
-  voice_2_samples_between_grains: f32,
+  movement_samples_per_sample: f32,
+  sample_speed_ratio: f32,
+  samples_between_grains: f32,
 ) -> *const f32 {
   let ctx = unsafe { &mut *ctx };
 
@@ -464,25 +440,24 @@ pub fn render_granular(
   let linear_slope_length = clamp(0., 1., linear_slope_length);
   let slope_linearity = clamp(0., 1., slope_linearity);
 
+  // Use the smoothed selection bounds (the raw params were previously smoothed above and then
+  // ignored), and clamp the grain to the selection so it can never read past the end.
+  let selection_start = ctx.last_start_sample_ix;
+  let selection_end = ctx.last_end_sample_ix;
+  let grain_size = clamp(1., (selection_end - selection_start).max(1.), ctx.last_grain_size);
+
   for i in 0..FRAME_SIZE {
     let sample = ctx.get_sample(
-      selection_start_sample_ix,
-      selection_end_sample_ix,
-      ctx.last_grain_size,
+      selection_start,
+      selection_end,
+      grain_size,
       linear_slope_length,
       slope_linearity,
-      voice_1_filter_cutoff,
-      voice_2_filter_cutoff,
-      voice_1_samples_between_grains,
-      voice_2_samples_between_grains,
-      1.,
-      0.,
-      voice_1_movement_samples_per_sample,
-      voice_2_movement_samples_per_sample,
-      voice_1_sample_speed_ratio,
-      voice_2_sample_speed_ratio,
-      200.,
-      0.,
+      filter_cutoff,
+      samples_between_grains,
+      movement_samples_per_sample,
+      sample_speed_ratio,
+      200., // grain start randomness; no UI yet, see followups doc
     );
     ctx.rendered_output[i] = sample;
   }
