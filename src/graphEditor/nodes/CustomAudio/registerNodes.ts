@@ -91,6 +91,11 @@ const registerCustomAudioNode = (
   };
 
   CustomAudioNode.prototype.onRemoved = function (this: any) {
+    // `ignoreDeletion` is set by graph diffing when a node is removed only because it left the
+    // visible subgraph; the underlying audio node is still live and must not be torn down.
+    if (this.ignoreDeletion) {
+      return;
+    }
     this.onRemovedCustom?.();
     this.connectables?.node?.shutdown?.();
   };

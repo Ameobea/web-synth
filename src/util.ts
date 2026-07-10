@@ -368,6 +368,12 @@ export const isSafari = () => {
 
 export const noop = () => {};
 
+/** Tears down a started `ConstantSourceNode`; a started source node is processed until stopped. */
+export const disposeCSN = (csn: ConstantSourceNode) => {
+  csn.stop();
+  csn.disconnect();
+};
+
 /**
  * Unescapes HTML entities in a string, converting a string like "a &amp; b" to "a & b".
  *

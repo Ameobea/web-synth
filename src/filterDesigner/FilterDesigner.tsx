@@ -5,6 +5,7 @@ import ControlPanel from 'react-control-panel';
 
 import d3 from './d3';
 import './FilterDesigner.css';
+import { FilterDesignerStateByVcId } from 'src/filterDesigner/filterDesignerRegistry';
 import {
   connectFilterChain,
   deserializeFilterDesigner,
@@ -149,7 +150,7 @@ const FilterParamsEditor = React.memo(FilterParamsEditorInner);
 
 const ScratchFilter = ctx.createBiquadFilter();
 
-class FilterDesigner {
+export class FilterDesigner {
   private state: FilterDesignerState;
   private containerId: string;
   private svg!: Selection<SVGGElement, unknown, HTMLElement, any>;
@@ -283,11 +284,7 @@ class FilterDesigner {
   }
 }
 
-const StateByVcId: Map<string, FilterDesigner> = new Map();
-
-export const cleanupFilterDesignerInst = (vcId: string) => {
-  StateByVcId.delete(vcId);
-};
+const StateByVcId = FilterDesignerStateByVcId;
 
 interface ConfigureFilterGroupProps {
   state: FilterDesignerState;

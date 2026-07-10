@@ -122,9 +122,7 @@ pub fn render_waveform(ctx: *mut WaveformRendererCtx, start_ms: f32, end_ms: f32
   assert_eq!(ctx.height_px % 2, 0, "Height must be divisible by 2");
 
   let len_samples = end_sample_ix - start_sample_ix;
-  // Fractional so the rendered span matches the requested view exactly at any zoom.  With integer
-  // division the image desynced from the selection overlay and, when fewer samples than pixels
-  // were in view, the column loop read past the end of the buffer.
+  // Fractional so the rendered span matches the requested view exactly at any zoom.
   let samples_per_px = len_samples as f32 / ctx.width_px as f32;
 
   let max_distance_from_0 = ctx.waveform_buf[start_sample_ix as usize..end_sample_ix as usize]

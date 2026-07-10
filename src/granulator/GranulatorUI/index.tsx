@@ -219,9 +219,8 @@ const GranulatorUI: React.FC<GranulatorUIProps> = ({
           ? null
           : (endMarkPosSamples / (activeSample?.sampleData.sampleRate ?? 44100)) * 1000,
     });
-    // Keyed on `activeSample` (not just its sample rate) so the renderer's selection is restored
-    // from the persisted params on every sample change — otherwise switching between two samples
-    // with the same rate leaves the renderer's selection out of sync with the overlay and engine.
+    // Keyed on the whole `activeSample` so the selection is restored from the persisted params on
+    // every sample change, including swaps between two samples with the same sample rate.
   }, [activeSample, inst, vcId, waveformRenderer]);
 
   useEffect(() => {

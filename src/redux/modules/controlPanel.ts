@@ -6,6 +6,7 @@ import type { ConnectableDescriptor } from 'src/patchNetwork';
 import { connect, updateConnectables } from 'src/patchNetwork/interface';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { getState } from 'src/redux';
+import { disposeCSN } from 'src/util';
 
 export interface ControlPanelState {
   stateByPanelInstance: {
@@ -333,10 +334,7 @@ const actionGroups = {
   REMOVE_INSTANCE: buildActionGroup({
     actionCreator: (vcId: string) => ({ type: 'REMOVE_INSTANCE', vcId }),
     subReducer: (state: ControlPanelState, { vcId }) => {
-      state.stateByPanelInstance[vcId]?.controls.forEach(conn => {
-        conn.node.stop();
-        conn.node.disconnect();
-      });
+      state.stateByPanelInstance[vcId]?.controls.forEach(conn => disposeCSN(conn.node));
       delete state.stateByPanelInstance[vcId];
       return { stateByPanelInstance: { ...state.stateByPanelInstance } };
     },
@@ -409,10 +407,7 @@ const actionGroups = {
       if (removedConns.length !== 1) {
         console.error('Expected to find one conn to remove, found these: ', removedConns);
       }
-      removedConns.forEach(conn => {
-        conn.node.stop();
-        conn.node.disconnect();
-      });
+      removedConns.forEach(conn => disposeCSN(conn.node));
 
       const newInstState = { ...instance, controls: retainedConns };
       setTimeout(() =>
@@ -572,10 +567,7 @@ const actionGroups = {
         return state;
       }
 
-      instanceState.controls.forEach(conn => {
-        conn.node.stop();
-        conn.node.disconnect();
-      });
+      instanceState.controls.forEach(conn => disposeCSN(conn.node));
 
       return {
         stateByPanelInstance: {

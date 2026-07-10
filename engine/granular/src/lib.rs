@@ -1,4 +1,5 @@
-//! Granular synth operating on a fixed buffer of samples.  It has multiple voices that each exist
+https://i.ameo.link/dw8.png
+// //! Granular synth operating on a fixed buffer of samples.  It has multiple voices that each exist
 //! at different places within a selection of the sample buffer and move at different speeds,
 //! seeding grains from where they currently are playing.
 //!
@@ -406,6 +407,12 @@ pub fn render_granular(
 ) -> *const f32 {
   let ctx = unsafe { &mut *ctx };
 
+  // `read_interpolated` needs at least 2 samples; anything shorter is a degenerate waveform.
+  if ctx.waveform.len() < 2 {
+    ctx.rendered_output = [0.; FRAME_SIZE];
+    return ctx.rendered_output.as_ptr();
+  }
+
   // Apply smoothing to the input of the start and end sample to try to avoid clicking
   if ctx.last_start_sample_ix > 0. {
     smooth(
@@ -440,8 +447,7 @@ pub fn render_granular(
   let linear_slope_length = clamp(0., 1., linear_slope_length);
   let slope_linearity = clamp(0., 1., slope_linearity);
 
-  // Use the smoothed selection bounds (the raw params were previously smoothed above and then
-  // ignored), and clamp the grain to the selection so it can never read past the end.
+  // Grain is clamped to the smoothed selection bounds so it can never read past the end.
   let selection_start = ctx.last_start_sample_ix;
   let selection_end = ctx.last_end_sample_ix;
   let grain_size = clamp(1., (selection_end - selection_start).max(1.), ctx.last_grain_size);

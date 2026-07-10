@@ -102,13 +102,37 @@ const buildDefaultGranulatorState = (): SerializedGranulator => ({
   endSample: null,
 });
 
+// Maps the old per-voice control keys onto the single-voice keys, falling back to defaults for
+// anything missing.
+const migrateControlPanelState = (cps: any): GranulatorControlPanelState => {
+  const defaults = buildDefaultGranulatorState().controlPanelState;
+  return {
+    grain_size: cps.grain_size ?? defaults.grain_size,
+    samples_between_grains:
+      cps.samples_between_grains ??
+      cps.voice_1_samples_between_grains ??
+      defaults.samples_between_grains,
+    sample_speed_ratio: cps.sample_speed_ratio ?? defaults.sample_speed_ratio,
+    filter_cutoff: cps.filter_cutoff ?? cps.voice_1_filter_cutoff ?? defaults.filter_cutoff,
+    linear_slope_length: cps.linear_slope_length ?? defaults.linear_slope_length,
+    slope_linearity: cps.slope_linearity ?? defaults.slope_linearity,
+    movement_samples_per_sample:
+      cps.movement_samples_per_sample ??
+      cps.voice_1_movement_samples_per_sample ??
+      defaults.movement_samples_per_sample,
+  };
+};
+
 const deserializeGranulator = (serialized: string): SerializedGranulator => {
   try {
     const deserialized = JSON.parse(serialized);
     if (!deserialized.controlPanelState) {
       throw new Error();
     }
-    return deserialized;
+    return {
+      ...deserialized,
+      controlPanelState: migrateControlPanelState(deserialized.controlPanelState),
+    };
   } catch (err) {
     console.warn('Error deserializing granulator state: ', err);
     return buildDefaultGranulatorState();

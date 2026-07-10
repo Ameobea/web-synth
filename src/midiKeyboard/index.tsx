@@ -25,7 +25,7 @@ import {
   type MidiKeyboardStateItem,
 } from 'src/redux/modules/midiKeyboard';
 import { create_empty_audio_connectables } from 'src/redux/modules/vcmUtils';
-import { tryParseJson, UnreachableError } from 'src/util';
+import { disposeCSN, tryParseJson, UnreachableError } from 'src/util';
 
 export {
   MidiKeyboardCtxByStateKey,
@@ -251,10 +251,7 @@ export const cleanup_midi_keyboard = (stateKey: string): string => {
   const serialized = serializeMIDIKeyboard(ctx, stateKey);
 
   getState().midiKeyboard[stateKey]?.midiInput?.destroy();
-  ctx.mappedOutputs.forEach(output => {
-    output.csn.stop();
-    output.csn.disconnect();
-  });
+  ctx.mappedOutputs.forEach(output => disposeCSN(output.csn));
   ctx.midiNode.dispose();
   dispatch(actionCreators.midiKeyboard.DELETE_MIDI_KEYBOARD(stateKey));
   MidiKeyboardCtxByStateKey.delete(stateKey);

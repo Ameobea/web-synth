@@ -22,7 +22,7 @@ import { getSample } from 'src/sampleLibrary';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
 import { SequencerBeatPlayerByVoiceType } from 'src/sequencer/scheduler';
-import { AsyncOnce, UnreachableError, filterNils } from 'src/util';
+import { AsyncOnce, UnreachableError, disposeCSN, filterNils } from 'src/util';
 import {
   buildInitialState,
   buildSequencerConfig,
@@ -392,10 +392,7 @@ export const cleanup_sequencer = (stateKey: string) => {
   localStorage.setItem(stateKey, serialized);
 
   const seqState = reduxInfra.getState().sequencer;
-  seqState.gateOutputs.forEach(csn => {
-    csn.stop();
-    csn.disconnect();
-  });
+  seqState.gateOutputs.forEach(disposeCSN);
   seqState.midiOutputs.forEach(node => node.dispose());
   seqState.outputGainNode.disconnect();
   if (seqState.awpHandle) {

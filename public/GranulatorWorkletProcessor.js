@@ -84,9 +84,8 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
   }
 
   initGranularCtx() {
-    // Reuse the existing context across sample changes; creating a new one each time leaked the old
-    // context and its entire waveform buffer.  `get_granular_waveform_ptr` reallocates the waveform,
-    // so a fresh context is only needed the first time.
+    // `get_granular_waveform_ptr` reallocates the waveform, so the context is created once and
+    // reused across sample changes.
     if (!this.granularInstCtxPtr) {
       this.granularInstCtxPtr = this.wasmInstance.exports.create_granular_instance();
     }

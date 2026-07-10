@@ -3,6 +3,7 @@ import { Map as ImmMap } from 'immutable';
 import * as R from 'ramda';
 import React, { Suspense } from 'react';
 
+import { cleanupFilterDesignerInst } from 'src/filterDesigner/filterDesignerRegistry';
 import {
   connectFilterChain,
   deserializeFilterDesigner,
@@ -137,9 +138,7 @@ export const cleanup_filter_designer = (stateKey: string) => {
     state.input.disconnect();
     StatesByVcId.delete(vcId);
   }
-  // The `FilterDesigner` d3 class lives in the lazily-loaded component module (already loaded by
-  // now); import dynamically so we don't pull d3 into the main bundle just for cleanup.
-  void import('./FilterDesigner').then(m => m.cleanupFilterDesignerInst(vcId));
+  cleanupFilterDesignerInst(vcId);
 
   mkContainerCleanupHelper()(getFilterDesignerDOMElementId(vcId));
 };

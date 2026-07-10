@@ -9,7 +9,7 @@ import {
 } from 'src/midiKeyboard/midiKeyboardCtx';
 import { MIDIInput } from 'src/midiKeyboard/midiInput';
 import { updateConnectables } from 'src/patchNetwork/interface';
-import { UnreachableError, mkLinearToLog } from 'src/util';
+import { UnreachableError, disposeCSN, mkLinearToLog } from 'src/util';
 
 const ctx = new AudioContext();
 
@@ -365,8 +365,7 @@ const actionGroups = {
       const ctx = getMidiKeyboardCtx(stateKey);
       const removed = ctx.mappedOutputs[outputIx];
       if (removed) {
-        removed.csn.stop();
-        removed.csn.disconnect();
+        disposeCSN(removed.csn);
       }
       ctx.mappedOutputs = R.remove(outputIx, 1, ctx.mappedOutputs);
 
