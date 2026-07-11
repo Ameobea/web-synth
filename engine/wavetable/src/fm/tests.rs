@@ -109,7 +109,10 @@ fn sample_mapping_mid_frame_start() {
     let a = mk_sample_ctx();
     gate(a, 60, 90, 0);
     let reference = render_frames(a, 2);
-    assert!(reference.iter().any(|&s| s.abs() > 0.01), "sampler is silent");
+    assert!(
+      reference.iter().any(|&s| s.abs() > 0.01),
+      "sampler is silent"
+    );
 
     let offset = 100usize;
     let b = mk_sample_ctx();

@@ -652,8 +652,9 @@ impl OscillatorSource {
         sample_ix_within_frame,
         base_frequency,
       ),
-      OscillatorSource::ExponentialOscillator(osc) => osc.gen_sample(
+      OscillatorSource::ExponentialOscillator(osc) => osc.gen_sample_with_phase_mod(
         frequency,
+        phase_modulation,
         param_buffers,
         adsrs,
         sample_ix_within_frame,
@@ -1494,8 +1495,8 @@ impl FMSynthContext {
   }
 
   /// Snapshots the most-recently-gated voice's effective filter params for the response viz.  When
-  /// that voice is idle (the audio path skips it, leaving its rendered params stale), the params are
-  /// re-rendered here for a single voice so the plot reflects the configured/at-rest filter.
+  /// that voice is idle (the audio path skips it, leaving its rendered params stale), the params
+  /// are re-rendered here for a single voice so the plot reflects the configured/at-rest filter.
   fn snapshot_filter_viz(&mut self, cur_bpm: f32, cur_frame_start_beat: f32) {
     let rep_ix = self.most_recent_gated_voice_ix;
     let idle = unsafe {
@@ -1604,8 +1605,7 @@ pub unsafe extern "C" fn init_fm_synth_ctx() -> *mut FMSynthContext {
         move |voice_ix: usize, note_id: usize, velocity: u8, offset: Option<f32>| {
           let frequency = midi_number_to_frequency(note_id) * (*ctx).frequency_multiplier;
           (&mut *ctx).base_frequency_input_buffer[voice_ix].fill(frequency);
-          (*ctx).voices[voice_ix].attack_start_sample_ix =
-            offset.map(|o| o as usize).unwrap_or(0);
+          (*ctx).voices[voice_ix].attack_start_sample_ix = offset.map(|o| o as usize).unwrap_or(0);
           gate_voice_inner(ctx, voice_ix, note_id, velocity);
           on_gate_cb(note_id, voice_ix);
         },

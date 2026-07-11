@@ -395,18 +395,13 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     const newEffect = effectUpdate ? { ...oldEffect, ...(effectUpdate as any) } : effectUpdate;
 
     const newMainEffectChain = [...state.mainEffectChain];
-    newMainEffectChain[effectIx] = newEffect;
-    if (!newEffect) {
-      // Slide remaining effects down.  Deleting will trigger this to happen on the
-      // backend as well.
-      for (let i = effectIx; i < newMainEffectChain.length; i++) {
-        const nextEffect = newMainEffectChain[i + 1];
-        if (nextEffect) {
-          newMainEffectChain[i] = nextEffect;
-          newMainEffectChain[i + 1] = null;
-          setEffect(null, i + 1, null);
-        }
-      }
+    if (newEffect) {
+      newMainEffectChain[effectIx] = newEffect;
+    } else {
+      // The engine compacts the chain on remove; mirror that locally and send only the
+      // single delete
+      newMainEffectChain.splice(effectIx, 1);
+      newMainEffectChain.push(null);
     }
 
     setEffect(null, effectIx, newEffect);
@@ -428,22 +423,16 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
     setEffect(selectedOperatorIx, effectIx, newEffect);
     const newState = { ...state };
     newState.operatorEffects = [...newState.operatorEffects];
-    newState.operatorEffects[selectedOperatorIx] = [
-      ...newState.operatorEffects[selectedOperatorIx],
-    ];
-    newState.operatorEffects[selectedOperatorIx][effectIx] = newEffect;
-
-    if (!newEffect) {
-      // Slide remaining effects down.  Deleting will trigger this to happen on the backend as well.
-      for (let i = effectIx; i < newState.operatorEffects[selectedOperatorIx].length; i++) {
-        const nextEffect = newState.operatorEffects[selectedOperatorIx][i + 1];
-        if (nextEffect) {
-          newState.operatorEffects[selectedOperatorIx][i] = nextEffect;
-          newState.operatorEffects[selectedOperatorIx][i + 1] = null;
-          setEffect(selectedOperatorIx, i + 1, null);
-        }
-      }
+    const newChain = [...newState.operatorEffects[selectedOperatorIx]];
+    if (newEffect) {
+      newChain[effectIx] = newEffect;
+    } else {
+      // The engine compacts the chain on remove; mirror that locally and send only the
+      // single delete
+      newChain.splice(effectIx, 1);
+      newChain.push(null);
     }
+    newState.operatorEffects[selectedOperatorIx] = newChain;
 
     setState(newState);
   };

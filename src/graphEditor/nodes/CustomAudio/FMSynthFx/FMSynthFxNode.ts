@@ -39,6 +39,7 @@ export class FMSynthFxNode implements ForeignNode {
   private ctx: AudioContext;
   private vcId: string;
   private awpHandle: AudioWorkletNode | null = null;
+  private wasShutdown = false;
   private store: Writable<FMSynthFxState>;
   private dummyInput: DummyNode = new DummyNode();
   private dummyParams: [DummyNode, DummyNode, DummyNode, DummyNode] = [
@@ -86,6 +87,9 @@ export class FMSynthFxNode implements ForeignNode {
       WavetableWasmBytes.get(),
       FMSynthFxAWPRegistered.get(),
     ] as const);
+    if (this.wasShutdown) {
+      return;
+    }
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-fx-awp', {
       numberOfInputs: 1,
       numberOfOutputs: 1,
@@ -138,18 +142,13 @@ export class FMSynthFxNode implements ForeignNode {
       this.commitEffect(effectIx, newEffect);
       const newState = { ...state };
       newState.effects = [...state.effects];
-      newState.effects[effectIx] = newEffect;
-
-      if (!newEffect) {
-        // Slide remaining effects down.  Deleting will trigger this to happen on the backend as well.
-        for (let i = effectIx; i < newState.effects.length; i++) {
-          const nextEffect = newState.effects[i + 1];
-          if (nextEffect) {
-            newState.effects[i] = nextEffect;
-            newState.effects[i + 1] = null;
-            this.commitEffect(i + 1, null);
-          }
-        }
+      if (newEffect) {
+        newState.effects[effectIx] = newEffect;
+      } else {
+        // The engine compacts the chain on remove; mirror that locally and send only the
+        // single delete
+        newState.effects.splice(effectIx, 1);
+        newState.effects.push(null);
       }
 
       return newState;
@@ -171,6 +170,11 @@ export class FMSynthFxNode implements ForeignNode {
 
   public serialize(): FMSynthFxState {
     return R.clone(get(this.store));
+  }
+
+  public shutdown() {
+    this.wasShutdown = true;
+    this.awpHandle?.port.postMessage({ type: 'shutdown' });
   }
 
   public buildConnectables() {

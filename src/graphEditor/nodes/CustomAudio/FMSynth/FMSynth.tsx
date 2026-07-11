@@ -198,6 +198,7 @@ export default class FMSynth implements ForeignNode {
   private vcId: string | undefined;
   private audioThreadMIDIEventMailboxID?: string;
   private awpHandle: AudioWorkletNode | null = null;
+  private wasShutdown = false;
   private modulationMatrix: ParamSource[][] = buildDefaultModulationIndices();
   private outputWeights: ParamSource[] = new Array(OPERATOR_COUNT)
     .fill(null as any)
@@ -420,6 +421,9 @@ export default class FMSynth implements ForeignNode {
       RegisterFMSynthAWP.get(),
       EventSchedulerInitialized,
     ] as const);
+    if (this.wasShutdown) {
+      return;
+    }
     this.awpHandle = new AudioWorkletNode(this.ctx, 'fm-synth-audio-worklet-processor', {
       numberOfInputs: 0,
       numberOfOutputs: 1,
@@ -446,6 +450,9 @@ export default class FMSynth implements ForeignNode {
     this.awpHandle.port.onmessage = evt => {
       switch (evt.data.type) {
         case 'wasmInitialized': {
+          if (this.wasShutdown) {
+            break;
+          }
           if (evt.data.audioThreadDataBuffer) {
             this.audioThreadDataBuffer = new Float32Array(
               evt.data.audioThreadDataBuffer as SharedArrayBuffer
@@ -461,14 +468,20 @@ export default class FMSynth implements ForeignNode {
           this.operatorConfigs.forEach((config, opIx) =>
             this.handleOperatorConfigChange(opIx, config)
           );
+          // Skip nulls: the fresh wasm chains are already empty, and replaying a delete
+          // would compact the mirror mid-iteration
           this.operatorEffects.forEach((effectsForOp, opIx) => {
             effectsForOp.forEach((effect, effectIx) => {
-              this.setEffect(opIx, effectIx, effect);
+              if (effect) {
+                this.setEffect(opIx, effectIx, effect);
+              }
             });
           });
-          this.mainEffectChain.forEach((effect, effectIx) =>
-            this.setEffect(null, effectIx, effect)
-          );
+          this.mainEffectChain.forEach((effect, effectIx) => {
+            if (effect) {
+              this.setEffect(null, effectIx, effect);
+            }
+          });
           this.handleDetuneChange(this.detune);
           this.setFilterBypassed(this.filterBypassed);
           this.setFilterParams(this.filterParams);
@@ -907,10 +920,13 @@ export default class FMSynth implements ForeignNode {
       console.error('Tried to set effect before AWP initialization');
       return;
     }
-    if (operatorIx === null) {
-      this.mainEffectChain[effectIx] = R.clone(newEffect);
+    // The engine compacts the chain on remove, so the mirror must compact too
+    const chain = operatorIx === null ? this.mainEffectChain : this.operatorEffects[operatorIx];
+    if (newEffect) {
+      chain[effectIx] = R.clone(newEffect);
     } else {
-      this.operatorEffects[operatorIx][effectIx] = R.clone(newEffect);
+      chain.splice(effectIx, 1);
+      chain.push(null);
     }
 
     const [effectType, param1, param2, param3, param4] = encodeEffect(newEffect);
@@ -1055,12 +1071,10 @@ export default class FMSynth implements ForeignNode {
   }
 
   public shutdown() {
-    if (!this.awpHandle) {
-      console.error('Tried to shut down FM synth before AWP initialized');
-      return;
-    }
-
-    this.awpHandle.port.postMessage({ type: 'shutdown' });
+    // If the AWP doesn't exist yet, `init()` checks this flag after its awaits and bails
+    // before constructing it
+    this.wasShutdown = true;
+    this.awpHandle?.port.postMessage({ type: 'shutdown' });
   }
 
   public serialize() {

@@ -654,12 +654,12 @@ class FMSynthAWP extends AudioWorkletProcessor {
   }
 
   process(_inputs, outputs, params) {
-    if (!this.wasmInstance) {
-      return true;
-    }
     if (this.shutdown) {
       console.log('Shutting down FM Synth AWP', this.debugID);
       return false;
+    }
+    if (!this.wasmInstance) {
+      return true;
     }
 
     if (globalThis.globalTempoBPM) {

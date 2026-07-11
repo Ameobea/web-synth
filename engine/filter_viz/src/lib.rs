@@ -90,10 +90,17 @@ fn order_chain_response(
 
 #[inline]
 fn dyna_response(cutoff: f32, bandwidth: f32, grid: usize) -> Vec<f32> {
-  DynabandpassFilter::compute_response_grid::<f32>(cutoff, bandwidth, START_FREQ, SAMPLE_RATE, grid).1
+  DynabandpassFilter::compute_response_grid::<f32>(cutoff, bandwidth, START_FREQ, SAMPLE_RATE, grid)
+    .1
 }
 
-fn compute_linear_mags(filter_type: usize, q: f32, cutoff: f32, gain: f32, grid: usize) -> Vec<f32> {
+fn compute_linear_mags(
+  filter_type: usize,
+  q: f32,
+  cutoff: f32,
+  gain: f32,
+  grid: usize,
+) -> Vec<f32> {
   use FilterMode::*;
   match filter_type {
     0 => single_response(Lowpass, q, cutoff, gain, grid),

@@ -324,7 +324,9 @@ impl FilterModule {
       .render_raw(&render_params, &mut self.rendered_cutoff_freq);
     let filter_mode = self.filter_state.get_filter_mode();
     if filter_mode.map(|mode| mode.needs_gain()).unwrap_or(false) {
-      self.gain.render_raw(&render_params, &mut self.rendered_gain);
+      self
+        .gain
+        .render_raw(&render_params, &mut self.rendered_gain);
     } else {
       self.rendered_gain = ZERO_FRAME;
     }

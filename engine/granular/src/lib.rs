@@ -1,5 +1,4 @@
-https://i.ameo.link/dw8.png
-// //! Granular synth operating on a fixed buffer of samples.  It has multiple voices that each exist
+//! Granular synth operating on a fixed buffer of samples.  It has multiple voices that each exist
 //! at different places within a selection of the sample buffer and move at different speeds,
 //! seeding grains from where they currently are playing.
 //!
@@ -450,7 +449,11 @@ pub fn render_granular(
   // Grain is clamped to the smoothed selection bounds so it can never read past the end.
   let selection_start = ctx.last_start_sample_ix;
   let selection_end = ctx.last_end_sample_ix;
-  let grain_size = clamp(1., (selection_end - selection_start).max(1.), ctx.last_grain_size);
+  let grain_size = clamp(
+    1.,
+    (selection_end - selection_start).max(1.),
+    ctx.last_grain_size,
+  );
 
   for i in 0..FRAME_SIZE {
     let sample = ctx.get_sample(

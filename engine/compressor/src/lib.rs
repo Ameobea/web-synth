@@ -323,7 +323,11 @@ impl Compressor {
     for i in 0..FRAME_SIZE {
       let newest_off = -((FRAME_SIZE - 1 - i) as isize);
       let delayed_off = newest_off - lookahead_samples;
-      let gr_off = if backwards_ramp { delayed_off } else { newest_off };
+      let gr_off = if backwards_ramp {
+        delayed_off
+      } else {
+        newest_off
+      };
       let gain_linear = db_to_gain(self.gr_buf.get(gr_off));
       last_gain = gain_linear;
       output_buf[i] += input_buf.get(delayed_off) * gain_linear * post_gain;

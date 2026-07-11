@@ -505,13 +505,13 @@ impl ExponentialOscillator {
     sample_ix_within_frame: usize,
     base_frequency: f32,
   ) -> f32 {
-    self.update_phase(frequency);
-
-    let stretch_factor =
-      self
-        .stretch_factor
-        .get(param_buffers, adsrs, sample_ix_within_frame, base_frequency);
-
-    self.gen_sample_with_stretch_factor(frequency, stretch_factor)
+    self.gen_sample_with_phase_mod(
+      frequency,
+      0.,
+      param_buffers,
+      adsrs,
+      sample_ix_within_frame,
+      base_frequency,
+    )
   }
 }

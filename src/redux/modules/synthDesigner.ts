@@ -297,6 +297,9 @@ export const deserializeSynthModule = (
   stateKey: string,
   synthIx: number
 ): SynthModule => {
+  // Normalize before touching the envelope; adding fields to a legacy
+  // `{attack, decay, release}` envelope defeats `normalizeEnvelope`'s shape detection
+  filterEnvelope = normalizeEnvelope(filterEnvelope);
   if (R.isNil(filterEnvelope.lengthMode)) {
     filterEnvelope.lengthMode = AdsrLengthMode.Samples;
   }
@@ -313,7 +316,7 @@ export const deserializeSynthModule = (
       : fmSynthConfig.gainEnvelope,
     filterEnvelope: filterEnvelope
       ? {
-          ...normalizeEnvelope(filterEnvelope),
+          ...filterEnvelope,
           lenSamples:
             (filterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
               ? msToSamples(filterADSRLength ?? 1000)
@@ -350,19 +353,13 @@ export const deserializeSynthModule = (
     fmSynth
   );
 
-  if ((filterEnvelope as any).attack) {
-    filterEnvelope = buildDefaultFilterEnvelope(filterEnvelope.audioThreadData);
-  }
-
-  const normalizedFilterEnvelope = normalizeEnvelope(filterEnvelope);
-
   const synthModule = {
     ...base,
     filterBypassed,
     masterGain,
-    filterEnvelope: normalizedFilterEnvelope,
+    filterEnvelope,
     filterADSRLength:
-      (normalizedFilterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
+      (filterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
         ? R.clamp(20, 100_000, filterADSRLength ?? 1000)
         : R.clamp(0.001, 100_000, filterADSRLength ?? 1),
     filterParams,

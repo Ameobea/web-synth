@@ -191,10 +191,19 @@ impl<
   }
 
   pub fn release_all(&mut self) {
-    for i in 0..VOICE_COUNT {
-      if let VoicePlayingStatus::Playing(note_id) = self.voices[i].playing {
-        self.trigger_release(note_id, None);
+    // `trigger_release` swaps voices around to manage the active range, which can move a
+    // still-playing voice into an already-visited slot; snapshot the playing notes first and
+    // release by note id so no voice gets skipped.
+    let mut playing_notes = [0usize; VOICE_COUNT];
+    let mut count = 0;
+    for voice in &self.voices {
+      if let VoicePlayingStatus::Playing(note_id) = voice.playing {
+        playing_notes[count] = note_id;
+        count += 1;
       }
+    }
+    for &note_id in &playing_notes[..count] {
+      self.trigger_release(note_id, None);
     }
   }
 }

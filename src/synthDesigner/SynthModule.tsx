@@ -303,6 +303,10 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
       </div>
 
       <SynthControlPanel
+        // The panel mirrors the gain envelope + ADSR length in local state seeded from the
+        // FMSynth instance; remount when the instance is swapped (e.g. voice preset load) so
+        // it can't push stale values into the new synth
+        key={synth.fmSynth.debugID}
         masterGain={synth.masterGain}
         pitchMultiplier={synth.pitchMultiplier}
         stateKey={stateKey}
