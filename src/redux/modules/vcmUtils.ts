@@ -121,6 +121,8 @@ export const disconnectNodes = (
 };
 
 let vcmUpdateQueued = false;
+let queuedConnectionsDirty = false;
+let queuedForeignConnectablesDirty = false;
 
 /**
  * Checks to see if connections and/or foreign nodes have changed between two versions of the patch network.
@@ -131,10 +133,6 @@ export const maybeUpdateVCM = (
   oldPatchNetwork: PatchNetwork,
   newPatchNetwork: PatchNetwork
 ) => {
-  if (vcmUpdateQueued) {
-    return;
-  }
-
   const connectionsUnchanged =
     oldPatchNetwork.connections.length === newPatchNetwork.connections.length &&
     oldPatchNetwork.connections.every(conn =>
@@ -151,25 +149,34 @@ export const maybeUpdateVCM = (
         .getOrElse(false)
     );
 
-  if (connectionsUnchanged && foreignConnectablesUnchanged) {
+  // Dirty flags accumulate across all calls made while an update is queued so that the commit
+  // covers every category dirtied in the interim, not just those from the call that queued it.
+  queuedConnectionsDirty = queuedConnectionsDirty || !connectionsUnchanged;
+  queuedForeignConnectablesDirty = queuedForeignConnectablesDirty || !foreignConnectablesUnchanged;
+
+  if (vcmUpdateQueued || (!queuedConnectionsDirty && !queuedForeignConnectablesDirty)) {
     return;
   }
   vcmUpdateQueued = true;
 
   setTimeout(() => {
-    try {
-      const freshPatchNetwork = getState().viewContextManager.patchNetwork;
-      const freshForeignConnectables = freshPatchNetwork.connectables.filter(({ node }) => !!node);
+    const connectionsDirty = queuedConnectionsDirty;
+    const foreignConnectablesDirty = queuedForeignConnectablesDirty;
+    vcmUpdateQueued = false;
+    queuedConnectionsDirty = false;
+    queuedForeignConnectablesDirty = false;
 
-      if (!connectionsUnchanged) {
-        engine.set_connections(JSON.stringify(freshPatchNetwork.connections));
-      }
+    const freshPatchNetwork = getState().viewContextManager.patchNetwork;
 
-      if (!foreignConnectablesUnchanged) {
-        commitForeignConnectables(engine, freshForeignConnectables);
-      }
-    } finally {
-      vcmUpdateQueued = false;
+    if (connectionsDirty) {
+      engine.set_connections(JSON.stringify(freshPatchNetwork.connections));
+    }
+
+    if (foreignConnectablesDirty) {
+      commitForeignConnectables(
+        engine,
+        freshPatchNetwork.connectables.filter(({ node }) => !!node)
+      );
     }
   });
 };

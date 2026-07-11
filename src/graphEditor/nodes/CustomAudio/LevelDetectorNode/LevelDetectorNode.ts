@@ -70,7 +70,12 @@ export class LevelDetectorNode implements ForeignNode {
       getProps: () => ({
         state: this.state,
         detectedLevelSAB: this.detectedLevelSAB,
-        onChange: (newState: LevelDetectorNodeState) => this.state.set(newState),
+        onChange: (newState: LevelDetectorNodeState) => {
+          this.state.set(newState);
+          if (this.windowSizeSamples instanceof OverridableAudioParam) {
+            this.windowSizeSamples.manualControl.offset.value = newState.windowSizeSamples;
+          }
+        },
       }),
     });
     this.cleanupSmallView = mkSvelteContainerCleanupHelper({ preserveRoot: true });

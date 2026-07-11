@@ -85,6 +85,11 @@ export class SamplerInstance {
 
   private async init() {
     const [samplerWasm] = await Promise.all([SamplerWasm.get(), SamplerAWPRegistered.get()]);
+    // The VC may have been deleted while the awaits were in flight; touching the engine
+    // for a dead vcId panics wasm-side
+    if (this.isShutdown) {
+      return;
+    }
     this.awpHandle = new AudioWorkletNode(ctx, 'sampler-awp', {
       numberOfInputs: 0,
       numberOfOutputs: 1,

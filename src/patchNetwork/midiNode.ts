@@ -5,6 +5,7 @@ import {
   getUniqueCBID,
   MIDIEventType,
   postMIDIEventToAudioThread,
+  registerCbWithID,
   registerGlobalStopCB,
   scheduleEventBeats,
   scheduleMIDIEventBeats,
@@ -302,6 +303,15 @@ export class MIDINode {
 
       if (needsUIThreadScheduling) {
         const cbId = getUniqueCBID();
+        // The scheduler AWP fires bare cbIds for UI-thread events, so the callback must be
+        // registered under the new ID or the rescheduled event will silently never fire
+        registerCbWithID(cbId, () => {
+          const fn = {
+            [MIDIEventType.Attack]: this.onAttack,
+            [MIDIEventType.Release]: this.onRelease,
+          }[evt.type].bind(this);
+          fn(evt.note, evt.velocity, true);
+        });
         cbIDs.push(cbId);
         eventsToReschedule.push({
           at: { type: 'beats' as const, beat: at.beat },

@@ -73,6 +73,7 @@ export class DetuneNode {
       this.ctx,
       (this.awpNode.parameters as Map<string, AudioParam>).get('detune_cents')
     );
+    this.detuneParam.manualControl.offset.value = get(this.state).detuneCents;
 
     updateConnectables(this.vcId, this.buildConnectables());
   }

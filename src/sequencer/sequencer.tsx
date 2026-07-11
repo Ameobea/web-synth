@@ -66,6 +66,10 @@ interface SerializedSequencer {
 
 const getSequencerDOMElementId = (vcId: string) => `sequencer-${vcId}`;
 
+// Descriptors captured at deserialization time, so that persisting while samples are still
+// loading round-trips the saved sample bank instead of serializing the 'LOADING' placeholder
+const PendingSampleBanksByVcId = new Map<string, SerializedSequencer['sampleBank']>();
+
 const serializeSequencer = (vcId: string): string => {
   const reduxInfra = SequencerInstancesMap.get(vcId);
   if (!reduxInfra) {
@@ -91,7 +95,10 @@ const serializeSequencer = (vcId: string): string => {
   const serialized: SerializedSequencer = {
     currentEditingVoiceIx,
     voices,
-    sampleBank: Object.values(sampleBank).map(item => (item ? item.descriptor : item)),
+    sampleBank:
+      typeof sampleBank === 'string'
+        ? (PendingSampleBanksByVcId.get(vcId) ?? {})
+        : Object.values(sampleBank).map(item => (item ? item.descriptor : item)),
     marks,
     bpm,
     isPlaying,
@@ -211,6 +218,7 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
     markEditState,
   }: SerializedSequencer = JSON.parse(serialized);
 
+  PendingSampleBanksByVcId.set(vcId, sampleBank);
   initSampleBank(sampleBank).then(sampleBank => {
     const reduxInfra = SequencerInstancesMap.get(vcId);
     if (!reduxInfra) {
@@ -400,6 +408,7 @@ export const cleanup_sequencer = (stateKey: string) => {
     seqState.awpHandle.disconnect();
   }
   SequencerInstancesMap.delete(vcId);
+  PendingSampleBanksByVcId.delete(vcId);
 
   mkContainerCleanupHelper()(getSequencerDOMElementId(vcId));
 };

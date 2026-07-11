@@ -194,13 +194,11 @@ const actionGroups = {
 
       disconnectNodes(fromConnectable.node, toConnectable.node, to);
 
-      const newConnections: [ConnectableDescriptor, ConnectableDescriptor][] = [
-        ...connections,
-      ].filter(
+      const newConnections: [ConnectableDescriptor, ConnectableDescriptor][] = connections.filter(
         ([from2, to2]) =>
           from2.name !== from.name ||
           from2.vcId !== from.vcId ||
-          to2.name !== to2.name ||
+          to2.name !== to.name ||
           to2.vcId !== to.vcId
       );
 
@@ -341,14 +339,10 @@ const actionGroups = {
       // no longer exist and replace the connectables object with the new one
       const oldConnectables = connectables.get(vcId);
       if (!oldConnectables) {
+        // The node was deleted (or not yet registered); inserting here would resurrect a zombie
+        // entry that keeps the foreign node alive with no corresponding graph node.
         console.warn(`Tried to update connectables for VC ID ${vcId} but old ones weren't found`);
-        return {
-          ...state,
-          patchNetwork: {
-            ...state.patchNetwork,
-            connectables: connectables.set(vcId, newConnectablesForNode),
-          },
-        };
+        return state;
       }
       const newConnectables = connectables.set(vcId, newConnectablesForNode);
 
@@ -367,8 +361,13 @@ const actionGroups = {
           return true;
         }
 
-        // If an underlying input or output has been deleted, the connection must be deleted as well.
-        if (deletedOutputNames.has(from.name) || deletedInputNames.has(to.name)) {
+        // If an underlying input or output has been deleted, the connection must be deleted as
+        // well.  The deleted-name sets only describe ports of the node being updated, so they must
+        // only be checked against the endpoint that belongs to it.
+        if (
+          (from.vcId === vcId && deletedOutputNames.has(from.name)) ||
+          (to.vcId === vcId && deletedInputNames.has(to.name))
+        ) {
           const connectedPair = getConnectedPair(connectables, from, to);
           if (!connectedPair) {
             return false;

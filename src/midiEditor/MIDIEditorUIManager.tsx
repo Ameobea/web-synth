@@ -461,8 +461,11 @@ export class MIDIEditorUIManager {
     this.instances.set(insts);
 
     const connections = getState().viewContextManager.patchNetwork.connections;
+    // CV outputs expose their output port under the bare instance name
     const oldInputName = `${oldName}_in`;
-    const oldOutputName = `${oldName}_out`;
+    const newInputName = `${newName}_in`;
+    const oldOutputName = inst.type === 'cvOutput' ? oldName : `${oldName}_out`;
+    const newOutputName = inst.type === 'cvOutput' ? newName : `${newName}_out`;
     const connectedInputs = connections.filter(
       ([_from, to]) => to.vcId === this.vcId && to.name === oldInputName
     );
@@ -473,10 +476,10 @@ export class MIDIEditorUIManager {
       updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId));
 
       for (const [from, to] of connectedInputs) {
-        connect(from, { ...to, name: `${newName}_in` });
+        connect(from, { ...to, name: newInputName });
       }
       for (const [from, to] of connectedOutputs) {
-        connect({ ...from, name: `${newName}_out` }, to);
+        connect({ ...from, name: newOutputName }, to);
       }
     });
   }

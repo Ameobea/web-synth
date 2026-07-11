@@ -7,6 +7,7 @@ import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
+import { logError } from 'src/sentry';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import { AsyncOnce, UnreachableError } from 'src/util';
 import WaveTableSmallView from './WaveTableSmallView.svelte';
@@ -74,6 +75,16 @@ export const WavetableWasmInstance = new AsyncOnce(() =>
 
 const getWavetableWasmBytes = () => WavetableWasmBytes.get();
 
+const WaveTableAWPRegistered = new AsyncOnce(
+  () =>
+    new AudioContext().audioWorklet.addModule(
+      process.env.ASSET_PATH +
+        'WaveTableNodeProcessor.js?cacheBust=' +
+        (window.location.host.includes('localhost') ? '' : genRandomStringID())
+    ),
+  true
+);
+
 export const getWavetableWasmInstance = () => WavetableWasmInstance.get();
 
 export const getWavetableWasmInstancePreloaded = () => {
@@ -110,21 +121,23 @@ export default class WaveTable implements ForeignNode {
       this.onInitialized = params.onInitialized;
     }
 
-    this.initWorklet().then(workletHandle => {
-      this.paramOverrides = this.buildParamOverrides(workletHandle);
+    this.initWorklet()
+      .then(workletHandle => {
+        this.paramOverrides = this.buildParamOverrides(workletHandle);
 
-      if (params) {
-        this.deserialize(params);
-      }
+        if (params) {
+          this.deserialize(params);
+        }
 
-      if (this.vcId.length > 0) {
-        updateConnectables(this.vcId, this.buildConnectables());
-      }
+        if (this.vcId.length > 0) {
+          updateConnectables(this.vcId, this.buildConnectables());
+        }
 
-      if (this.onInitialized) {
-        this.onInitialized(this);
-      }
-    });
+        if (this.onInitialized) {
+          this.onInitialized(this);
+        }
+      })
+      .catch(err => logError('Error initializing WaveTable node', err));
 
     if (this.vcId) {
       this.renderSmallView = mkSvelteContainerRenderHelper({
@@ -248,11 +261,7 @@ export default class WaveTable implements ForeignNode {
   }
 
   private async initWorklet() {
-    await this.ctx.audioWorklet.addModule(
-      process.env.ASSET_PATH +
-        'WaveTableNodeProcessor.js?cacheBust=' +
-        (window.location.href.includes('localhost') ? '' : genRandomStringID())
-    );
+    await WaveTableAWPRegistered.get();
     this.workletHandle = new AudioWorkletNode(this.ctx, 'wavetable-node-processor', {
       numberOfInputs: 0,
       numberOfOutputs: 1,

@@ -304,10 +304,15 @@ export class SubgraphPortalNode implements ForeignNode {
 
     // Rename ports on other subgraph portals
     for (const connectables of getState().viewContextManager.patchNetwork.connectables.values()) {
-      if (connectables.node && connectables.node instanceof SubgraphPortalNode) {
-        if (side === 'input' && connectables.node.txSubgraphID === this.rxSubgraphID) {
+      if (
+        connectables.node &&
+        connectables.node instanceof SubgraphPortalNode &&
+        connectables.node.txSubgraphID === this.rxSubgraphID &&
+        connectables.node.rxSubgraphID === this.txSubgraphID
+      ) {
+        if (side === 'input') {
           connectables.node.renamePort('output', oldName, newName);
-        } else if (side === 'output' && connectables.node.rxSubgraphID === this.txSubgraphID) {
+        } else {
           connectables.node.renamePort('input', oldName, newName);
         }
       }
@@ -379,7 +384,10 @@ export class SubgraphPortalNode implements ForeignNode {
     // Find other subgraph portals that have our rx as their tx and add inputs to them to match this one
     for (const connectables of getState().viewContextManager.patchNetwork.connectables.values()) {
       if (connectables.node && connectables.node instanceof SubgraphPortalNode) {
-        if (connectables.node.txSubgraphID === this.rxSubgraphID) {
+        if (
+          connectables.node.txSubgraphID === this.rxSubgraphID &&
+          connectables.node.rxSubgraphID === this.txSubgraphID
+        ) {
           connectables.node.registeredInputs.update(inputs => ({
             ...inputs,
             [outputName]: { type, node: new DummyNode(rxConnectableDescriptor.name) },

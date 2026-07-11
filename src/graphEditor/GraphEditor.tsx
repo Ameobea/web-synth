@@ -464,6 +464,30 @@ LGraphCanvas.prototype.processNodeDblClicked = (node: LGraphNode) => {
   ((node as any).connectables as AudioConnectables | undefined)?.node?.onNodeDblClicked?.();
 };
 
+// Stock LiteGraph handles Delete/Backspace and Ctrl+C/V on the canvas itself, mutating the graph
+// directly and bypassing the patch network entirely (shutting down live nodes, autoconnect-bridging
+// deleted nodes' neighbors, and paste-cloning unregistered ForeignNodes).  Route deletion through
+// the same path as the patched "Remove" menu option and disable the built-in clipboard.
+LGraphCanvas.prototype.deleteSelectedNodes = function (this: LGraphCanvas) {
+  for (const node of Object.values(this.selected_nodes ?? {})) {
+    const innerNode = ((node as any).connectables as AudioConnectables | undefined)?.node;
+    if (innerNode instanceof SubgraphPortalNode) {
+      // Deleting a portal deletes its entire subgraph; too destructive for a keypress
+      continue;
+    }
+
+    const vcId = node.id.toString();
+    if (vcId.length === 36) {
+      getEngine()!.delete_vc_by_id(vcId);
+    } else {
+      removeNode(vcId);
+    }
+  }
+};
+
+LGraphCanvas.prototype.copyToClipboard = function () {};
+LGraphCanvas.prototype.pasteFromClipboard = function () {};
+
 // Prevent litegraph from swallowing mouse navigation events
 const oldAdjustMouseEvent = LGraphCanvas.prototype.adjustMouseEvent;
 LGraphCanvas.prototype.adjustMouseEvent = function (this: LGraphCanvas, evt: any) {
@@ -501,20 +525,25 @@ const handleNodeSelectAction = async ({
 
   const nodeID: string = (lgNode as any).id.toString();
   if (lgNode instanceof LGAudioConnectables) {
-    const node = getState().viewContextManager.activeViewContexts.find(vc => vc.uuid === nodeID);
-    if (!node) {
-      return;
+    const vcStillExists = getState().viewContextManager.activeViewContexts.some(
+      vc => vc.uuid === nodeID
+    );
+    if (vcStillExists) {
+      (isNowSelected ? getEngine()!.render_small_view : getEngine()!.cleanup_small_view)(
+        nodeID,
+        smallViewDOMId
+      );
     }
 
-    (isNowSelected ? getEngine()!.render_small_view : getEngine()!.cleanup_small_view)(
-      nodeID,
-      smallViewDOMId
-    );
-
     if (isNowSelected) {
+      if (!vcStillExists) {
+        return;
+      }
       setCurSelectedNode(lgNode);
       setSelectedNodeVCID(nodeID);
     } else if (curSelectedNodeRef.current === lgNode) {
+      // Clear selection even if the VC was already deleted from Redux; otherwise deleting the
+      // selected VC leaves the small view panel open with stale content
       setCurSelectedNode(null);
       setSelectedNodeVCID(null);
     }
@@ -792,16 +821,8 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ stateKey }) => {
       lGraphCanvasRef.current = canvas;
 
       canvas.onNodeSelected = node => {
-        if (curSelectedNodeRef.current) {
-          handleNodeSelectAction({
-            smallViewDOMId,
-            lgNode: curSelectedNode,
-            setCurSelectedNode,
-            setSelectedNodeVCID,
-            isNowSelected: false,
-            curSelectedNodeRef,
-          });
-        }
+        // The previously selected node's cleanup is handled by litegraph's own
+        // `onNodeDeselected`, which fires via `deselectAllNodes` before selection changes
         handleNodeSelectAction({
           smallViewDOMId,
           lgNode: node,
@@ -822,6 +843,12 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ stateKey }) => {
         });
       };
       (graph as any).onNodeRemoved = (node: LGraphNode) => {
+        // Only clean up if the removed node is the selected one; the small view DOM is shared
+        // between all nodes, so cleaning up for an unrelated node clobbers the open small view
+        if (curSelectedNodeRef.current !== node) {
+          return;
+        }
+
         handleNodeSelectAction({
           smallViewDOMId,
           lgNode: node,
@@ -882,7 +909,7 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ stateKey }) => {
       // Set an entry into the mapping so that we can get the current instance's state before unmounting
       GraphEditorInstances.set(stateKey, graph);
     })();
-  }, [curSelectedNode, setCurSelectedNode, smallViewDOMId, stateKey, subgraphID, vcId]);
+  }, [setCurSelectedNode, smallViewDOMId, stateKey, subgraphID, vcId]);
 
   useEffect(() => {
     if (!lGraphInstance || !subgraphID) {
@@ -911,9 +938,17 @@ const GraphEditor: React.FC<GraphEditorProps> = ({ stateKey }) => {
       return;
     }
 
+    // Only re-select if the node was actually deleted + re-created by the diff above.
+    // Re-selecting an already-selected node runs `deselectAllNodes` first, which tears down and
+    // re-renders the open small view on every patch network change anywhere in the app.
+    const canvas = lGraphInstance.list_of_graphcanvas?.[0];
+    if (canvas?.selected_nodes?.[node.id]) {
+      return;
+    }
+
     setCurSelectedNode(node);
-    lGraphInstance.list_of_graphcanvas?.[0]?.selectNodes([node]);
-    lGraphInstance.list_of_graphcanvas?.[0]?.onNodeSelected?.(node);
+    canvas?.selectNodes([node]);
+    canvas?.onNodeSelected?.(node);
   }, [
     patchNetwork,
     lGraphInstance,

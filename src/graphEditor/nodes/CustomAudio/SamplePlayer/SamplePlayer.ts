@@ -212,7 +212,15 @@ export default class SamplePlayerNode implements ForeignNode {
   private removeSample(index: number) {
     this.sampleDescriptors = R.remove(index, 1, this.sampleDescriptors);
 
-    this.awpHandle?.port.postMessage({ type: 'removeSample', voiceIx: index });
+    if (this.awpHandle) {
+      this.inputGainNodes[index].param.dispose();
+      this.inputGainNodes.splice(index, 1);
+      const awpParams = this.awpHandle.parameters as Map<string, AudioParam>;
+      for (let i = index; i < this.inputGainNodes.length; i++) {
+        this.inputGainNodes[i].param.replaceParam(awpParams.get(`sample_${i}_gain`)!);
+      }
+      this.awpHandle.port.postMessage({ type: 'removeSample', voiceIx: index });
+    }
 
     if (!R.isNil(this.vcId)) {
       updateConnectables(this.vcId, this.buildConnectables());

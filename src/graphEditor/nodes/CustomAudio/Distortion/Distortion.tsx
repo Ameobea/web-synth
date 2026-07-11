@@ -7,6 +7,7 @@ import { OverridableAudioParam } from 'src/graphEditor/nodes/util';
 import type { ConnectableInput, ConnectableOutput } from 'src/patchNetwork';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
+import { logError } from 'src/sentry';
 import { AsyncOnce } from 'src/util';
 
 const DistortionWasmBytes = new AsyncOnce(
@@ -31,6 +32,7 @@ export default class DistortionNode implements ForeignNode {
   private vcId: string | undefined;
   private awpHandle: AudioWorkletNode | null = null;
   private stretchFactorOAP: OverridableAudioParam | DummyNode = new DummyNode();
+  private stretchFactor = 0;
 
   static typeName = 'Distortion';
   public nodeType = 'customAudio/distortion';
@@ -43,23 +45,21 @@ export default class DistortionNode implements ForeignNode {
     this.ctx = ctx;
     this.vcId = vcId;
 
-    // TODO: Deserialize
     if (params) {
       this.deserialize(params);
     }
 
-    this.init();
+    this.init().catch(err => logError('Error initializing Distortion node', err));
 
     this.renderSmallView = mkContainerRenderHelper({
       Comp: DistortionUI,
       getProps: () => ({
-        onChange: newDistortionVal => {
-          if (this.stretchFactorOAP instanceof DummyNode) {
-            console.warn('Tried to set distortion before AWP initialized');
-            return;
+        initialVal: this.stretchFactor,
+        onChange: (newDistortionVal: number) => {
+          this.stretchFactor = newDistortionVal;
+          if (this.stretchFactorOAP instanceof OverridableAudioParam) {
+            this.stretchFactorOAP.manualControl.offset.value = newDistortionVal;
           }
-          console.log({ newDistortionVal });
-          this.stretchFactorOAP.manualControl.offset.value = newDistortionVal;
         },
       }),
     });
@@ -80,6 +80,7 @@ export default class DistortionNode implements ForeignNode {
       this.ctx,
       (this.awpHandle.parameters as Map<string, AudioParam>).get('stretch factor')!
     );
+    this.stretchFactorOAP.manualControl.offset.value = this.stretchFactor;
 
     this.awpHandle.port.postMessage({ type: 'setWasmBytes', wasmBytes });
 
@@ -88,12 +89,12 @@ export default class DistortionNode implements ForeignNode {
     }
   }
 
-  private deserialize(_params: { [key: string]: any }) {
-    // TODO
+  private deserialize(params: { [key: string]: any }) {
+    this.stretchFactor = params.stretchFactor ?? this.stretchFactor;
   }
 
   public serialize() {
-    return {}; // TODO
+    return { stretchFactor: this.stretchFactor };
   }
 
   public buildConnectables() {

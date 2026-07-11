@@ -1,5 +1,4 @@
 const FRAME_SIZE = 128;
-const SAMPLE_RATE = 44_100;
 
 const getToSecondsMultiplier = fromUnit => {
   const curBPM = globalThis.globalTempoBPM;
@@ -8,7 +7,7 @@ const getToSecondsMultiplier = fromUnit => {
     beats: 60 / curBPM,
     seconds: 1,
     milliseconds: 1 / 1000,
-    samples: 1 / SAMPLE_RATE,
+    samples: 1 / sampleRate,
   }[fromUnit];
 };
 
@@ -20,24 +19,24 @@ const getMultiplier = (fromUnit, toUnit) => {
       beats: 1,
       seconds: 60 / curBPM,
       milliseconds: 60000 / curBPM,
-      samples: (60 / curBPM) * SAMPLE_RATE,
+      samples: (60 / curBPM) * sampleRate,
     },
     milliseconds: {
       beats: curBPM / 60000,
       seconds: 1 / 1000,
       milliseconds: 1,
-      samples: SAMPLE_RATE / 1000,
+      samples: sampleRate / 1000,
     },
     seconds: {
       beats: curBPM / 60,
       seconds: 1,
       milliseconds: 1000,
-      samples: SAMPLE_RATE,
+      samples: sampleRate,
     },
     samples: {
-      beats: curBPM / (60 * SAMPLE_RATE),
-      seconds: 1 / SAMPLE_RATE,
-      milliseconds: 1000 / SAMPLE_RATE,
+      beats: curBPM / (60 * sampleRate),
+      seconds: 1 / sampleRate,
+      milliseconds: 1000 / sampleRate,
       samples: 1,
     },
   }[fromUnit]?.[toUnit];
@@ -48,18 +47,12 @@ class TimeConverterAWP extends AudioWorkletProcessor {
     return [];
   }
 
-  onStateChanged() {
-    this.multiplier = getMultiplier(this.state.fromUnit, this.state.toUnit);
-  }
-
   constructor(_options) {
     super({ numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
 
     this.isShutdown = false;
     this.state = { fromUnit: 'beats', toUnit: 'milliseconds' };
-    this.multiplier = 1;
     this.didReportInitialized = false;
-    this.onStateChanged();
 
     this.port.onmessage = evt => {
       switch (evt.data.type) {
@@ -69,7 +62,6 @@ class TimeConverterAWP extends AudioWorkletProcessor {
         }
         case 'setState': {
           this.state = evt.data.state;
-          this.onStateChanged();
           if (!this.didReportInitialized) {
             this.didReportInitialized = true;
             this.port.postMessage({ type: 'initialized' });
@@ -100,9 +92,11 @@ class TimeConverterAWP extends AudioWorkletProcessor {
       return false;
     }
 
+    const multiplier = getMultiplier(this.state.fromUnit, this.state.toUnit);
+
     if (input.length === 1) {
-      if (typeof this.multiplier === 'number') {
-        const out = input[0] * this.multiplier;
+      if (typeof multiplier === 'number') {
+        const out = input[0] * multiplier;
         output.fill(out);
       } else {
         let inputInSeconds;
@@ -129,9 +123,9 @@ class TimeConverterAWP extends AudioWorkletProcessor {
         }
       }
     } else if (input.length === FRAME_SIZE) {
-      if (typeof this.multiplier === 'number') {
+      if (typeof multiplier === 'number') {
         for (let i = 0; i < FRAME_SIZE; i++) {
-          output[i] = input[i] * this.multiplier;
+          output[i] = input[i] * multiplier;
         }
       } else {
         switch (this.state.fromUnit) {

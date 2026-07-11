@@ -52,6 +52,14 @@ const registerCb = (cb: () => void): number => {
   return cbId;
 };
 
+/**
+ * Registers a callback under a pre-allocated ID from `getUniqueCBID`.  Needed when scheduling
+ * through paths like `cancelAndRescheduleManyEvents` that take already-built event descriptors.
+ */
+export const registerCbWithID = (cbId: number, cb: () => void) => {
+  RegisteredCbs.set(cbId, cb);
+};
+
 export const cancelCb = (cbId: number) => RegisteredCbs.delete(cbId);
 
 let StartCBs: ((startBeat: number) => void)[] = [];
@@ -413,9 +421,13 @@ export const cancelAndRescheduleManyEvents = (
     return;
   }
 
+  // The scheduler AWP will never fire the cancelled IDs, so drop their UI-thread registrations
+  cbIDsToCancel.forEach(cancelCb);
+
   const curBeat = getCurBeat() - 4;
   newEvents = newEvents.filter(evt => {
     if (evt.at.type === 'beats' && evt.at.beat < curBeat) {
+      cancelCb(evt.cbId);
       return false;
     }
     return true;

@@ -1048,11 +1048,12 @@ impl ViewContextManager {
     for vfc_id in &vfc_ids {
       if let Ok(uuid) = Uuid::from_str(&vfc_id) {
         if let Some(vc) = self.contexts.iter_mut().find(|vc| vc.id == uuid) {
+          let src_subgraph_id = vc.definition.subgraph_id;
           vc.definition.subgraph_id = target_subgraph_id;
           vc_ids_to_move.push(uuid);
 
-          if self.subgraphs_by_id[&vc.definition.subgraph_id].active_vc_id == vc.id {
-            subgraph_ids_needing_new_active_vc.insert(vc.definition.subgraph_id);
+          if self.subgraphs_by_id[&src_subgraph_id].active_vc_id == vc.id {
+            subgraph_ids_needing_new_active_vc.insert(src_subgraph_id);
             vc.context.hide();
           }
         }

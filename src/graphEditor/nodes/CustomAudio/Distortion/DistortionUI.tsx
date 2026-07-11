@@ -3,10 +3,13 @@ import ControlPanel from 'src/controls/LazyControlPanel';
 
 import './DistortionUI.css';
 
-const DistortionUI: React.FC<{ onChange: (newValue: number) => void }> = ({ onChange }) => {
+const DistortionUI: React.FC<{ initialVal: number; onChange: (newValue: number) => void }> = ({
+  initialVal,
+  onChange,
+}) => {
   const settings = useMemo(
-    () => [{ type: 'range', label: 'stretch factor', min: 0, max: 1, initial: 0.5 }],
-    []
+    () => [{ type: 'range', label: 'stretch factor', min: 0, max: 1, initial: initialVal }],
+    [initialVal]
   );
 
   return (
