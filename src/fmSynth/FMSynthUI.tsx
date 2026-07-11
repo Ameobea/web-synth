@@ -595,16 +595,18 @@ const FMSynthUI: React.FC<FMSynthUIProps> = ({
                   adsrs={state.adsrs}
                   onAdsrChange={handleAdsrChange}
                   wavetableState={state.wavetableState}
-                  setWavetableState={newWavetableStateOrFunc =>
-                    void setState(state => {
-                      const newWavetableState =
-                        typeof newWavetableStateOrFunc === 'function'
-                          ? newWavetableStateOrFunc(state.wavetableState)
-                          : newWavetableStateOrFunc;
-                      setWavetableState(newWavetableState);
-                      return { ...state, wavetableState: newWavetableState };
-                    })
-                  }
+                  setWavetableState={newWavetableStateOrFunc => {
+                    // the synth must be updated synchronously: `ConfigureOperator` follows this
+                    // call with a synchronous operator config change that looks the new bank up
+                    // on the synth.  Deferring it to the `setState` updater left freshly built
+                    // wavetables silent until some unrelated config change.
+                    const newWavetableState =
+                      typeof newWavetableStateOrFunc === 'function'
+                        ? newWavetableStateOrFunc(fmSynth.getWavetableState())
+                        : newWavetableStateOrFunc;
+                    setWavetableState(newWavetableState);
+                    setState(state => ({ ...state, wavetableState: newWavetableState }));
+                  }}
                   vcId={vcId}
                   sampleMappingStore={sampleMappingStore}
                   registerGateUngateCallbacks={registerGateUngateCallbacks}

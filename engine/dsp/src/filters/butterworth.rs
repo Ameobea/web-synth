@@ -13,6 +13,9 @@ pub struct ButterworthFilter {
 
 impl ButterworthFilter {
   #[inline]
+  pub fn reset(&mut self) { *self = Self::default(); }
+
+  #[inline]
   fn get_output(
     &self,
     amp_in0: f32,
@@ -54,7 +57,7 @@ impl ButterworthFilter {
     let amp_out2 = (c2 - csqr2 + 1.0) / d;
 
     let output = self.get_output(amp_in0, amp_in1, amp_in2, amp_out1, amp_out2, input);
-    debug_assert!(output.is_normal());
+    debug_assert!(output.is_finite());
     debug_assert!(output > -2.);
     debug_assert!(output < 2.);
     self.update_state(input, output);
@@ -83,7 +86,7 @@ impl ButterworthFilter {
     let amp_out2 = (1. - csqr2 + c2) / d;
 
     let output = self.get_output(amp_in0, amp_in1, amp_in2, amp_out1, amp_out2, input);
-    debug_assert!(output.is_normal());
+    debug_assert!(output.is_finite());
     debug_assert!(output > -5.);
     debug_assert!(output < 5.);
     self.update_state(input, output);
@@ -109,7 +112,7 @@ impl ButterworthFilter {
     let amp_out2 = (c - 1.) / d;
 
     let output = self.get_output(amp_in0, amp_in1, amp_in2, amp_out1, amp_out2, input);
-    debug_assert!(output.is_normal());
+    debug_assert!(output.is_finite());
     debug_assert!(output > -2.);
     debug_assert!(output < 2.);
     self.update_state(input, output);

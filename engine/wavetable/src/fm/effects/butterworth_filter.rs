@@ -104,4 +104,6 @@ impl Effect for ButterworthFilter {
   fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
     buf[0] = Some(&mut self.cutoff_freq);
   }
+
+  fn reset(&mut self) { self.inner.reset(); }
 }

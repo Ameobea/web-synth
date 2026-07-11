@@ -144,6 +144,8 @@ const buildDefaultFilterCSNs = (): FilterCSNs => ({
 const buildDefaultFilterEnvelope = (audioThreadData: AudioThreadData): Adsr => {
   const envelope = buildDefaultADSR2Envelope(audioThreadData);
   envelope.logScale = true;
+  // must match the default `filterADSRLength: 1000` the UI reports for fresh voices
+  envelope.lenSamples = msToSamples(1000);
   return envelope;
 };
 
@@ -303,7 +305,6 @@ export const deserializeSynthModule = (
   if (R.isNil(filterEnvelope.lengthMode)) {
     filterEnvelope.lengthMode = AdsrLengthMode.Samples;
   }
-  filterEnvelope.logScale = false;
 
   const vcId = stateKey.split('_')[1]!;
   const fmSynth = new FMSynth(ctx, undefined, {
@@ -313,16 +314,14 @@ export const deserializeSynthModule = (
     masterGain,
     gainEnvelope: gainEnvelope
       ? { ...normalizeEnvelope(gainEnvelope), lenSamples: msToSamples(gainADSRLength ?? 1000) }
-      : fmSynthConfig.gainEnvelope,
-    filterEnvelope: filterEnvelope
-      ? {
-          ...filterEnvelope,
-          lenSamples:
-            (filterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
-              ? msToSamples(filterADSRLength ?? 1000)
-              : (filterADSRLength ?? 1),
-        }
-      : fmSynthConfig.filterEnvelope,
+      : fmSynthConfig?.gainEnvelope,
+    filterEnvelope: {
+      ...filterEnvelope,
+      lenSamples:
+        (filterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
+          ? msToSamples(filterADSRLength ?? 1000)
+          : (filterADSRLength ?? 1),
+    },
     onInitialized: () => {
       fmSynth.setFrequencyMultiplier(pitchMultiplier);
 
@@ -343,30 +342,33 @@ export const deserializeSynthModule = (
     audioThreadMIDIEventMailboxID: `${vcId}-fm-synth-${genRandomStringID()}`,
   });
 
-  const base = buildDefaultSynthModule(
-    wavyJonesInstance,
-    stateKey,
-    filterParams.type,
-    synthIx,
-    filterEnvelope,
-    filterEnvelopeEnabled,
-    fmSynth
-  );
+  try {
+    const base = buildDefaultSynthModule(
+      wavyJonesInstance,
+      stateKey,
+      filterParams.type,
+      synthIx,
+      filterEnvelope,
+      filterEnvelopeEnabled,
+      fmSynth
+    );
 
-  const synthModule = {
-    ...base,
-    filterBypassed,
-    masterGain,
-    filterEnvelope,
-    filterADSRLength:
-      (filterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
-        ? R.clamp(20, 100_000, filterADSRLength ?? 1000)
-        : R.clamp(0.001, 100_000, filterADSRLength ?? 1),
-    filterParams,
-    pitchMultiplier: pitchMultiplier ?? 1,
-  };
-
-  return synthModule;
+    return {
+      ...base,
+      filterBypassed,
+      masterGain,
+      filterEnvelope,
+      filterADSRLength:
+        (filterEnvelope.lengthMode ?? AdsrLengthMode.Samples) === AdsrLengthMode.Samples
+          ? R.clamp(20, 100_000, filterADSRLength ?? 1000)
+          : R.clamp(0.001, 100_000, filterADSRLength ?? 1),
+      filterParams,
+      pitchMultiplier: pitchMultiplier ?? 1,
+    };
+  } catch (err) {
+    fmSynth.shutdown();
+    throw err;
+  }
 };
 
 export const getInitialSynthDesignerState = (vcId: string): SynthDesignerState => ({

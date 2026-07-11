@@ -12,6 +12,15 @@ pub const MAX_MIDI_CONTROL_VALUE_COUNT: usize = 1024;
 pub static mut MIDI_CONTROL_VALUES: [f32; MAX_MIDI_CONTROL_VALUE_COUNT] =
   [0.; MAX_MIDI_CONTROL_VALUE_COUNT];
 
+/// `rand`'s `gen_range` panics on an empty range
+fn gen_random(min: f32, max: f32) -> f32 {
+  if max > min {
+    common::rng().gen_range(min, max)
+  } else {
+    min
+  }
+}
+
 #[derive(Clone, Default, PartialEq)]
 pub struct AdsrState {
   pub adsr_ix: usize,
@@ -156,10 +165,10 @@ impl ParamSource {
         scale,
         shift,
       }) => {
-        let adsr = if cfg!(debug_assertions) {
-          &adsrs[*adsr_ix]
-        } else {
-          unsafe { adsrs.get_unchecked(*adsr_ix) }
+        // this path can be hit with an empty adsrs slice (ADSR-sourced ADSR length params)
+        let adsr = match adsrs.get(*adsr_ix) {
+          Some(adsr) => adsr,
+          None => return *shift,
         };
 
         (unsafe {
@@ -196,7 +205,7 @@ impl ParamSource {
       } => {
         let cur_value = if samples_since_last_update.get() >= *update_interval_samples {
           samples_since_last_update.set(0);
-          let new_target_val = common::rng().gen_range(*min, *max);
+          let new_target_val = gen_random(*min, *max);
           target_val.set(new_target_val);
           new_target_val
         } else {
@@ -216,6 +225,8 @@ impl ParamSource {
     }
   }
 
+  /// Indices are clamped here, at the message boundary, so the hot render paths can keep their
+  /// unchecked indexing.  An unassigned MIDI control encodes `control_index` as -1 → usize::MAX.
   pub fn from_parts(
     value_type: usize,
     value_param_int: usize,
@@ -224,7 +235,7 @@ impl ParamSource {
     value_param_float_3: f32,
   ) -> Self {
     match value_type {
-      0 => ParamSource::ParamBuffer(value_param_int),
+      0 => ParamSource::ParamBuffer(value_param_int.min(crate::fm::synth::MAX_PARAM_BUFFERS - 1)),
       1 => ParamSource::Constant {
         last_val: Cell::new(value_param_float),
         cur_val: value_param_float,
@@ -239,14 +250,14 @@ impl ParamSource {
         offset_hz: value_param_float_2,
       },
       4 => ParamSource::MIDIControlValue {
-        control_index: value_param_int,
+        control_index: value_param_int.min(MAX_MIDI_CONTROL_VALUE_COUNT - 1),
         scale: value_param_float,
         shift: value_param_float_2,
       },
       5 => ParamSource::BeatsToSamples(value_param_float),
       6 => {
         let (min, max) = (value_param_float, value_param_float_2);
-        let init = common::rng().gen_range(min, max);
+        let init = gen_random(min, max);
         ParamSource::Random {
           last_val: Cell::new(init),
           target_val: Cell::new(init),
@@ -257,7 +268,7 @@ impl ParamSource {
           smoothing_coefficient: value_param_float_3,
         }
       },
-      _ => panic!("Invalid value type; expected [0,4]"),
+      _ => ParamSource::new_constant(0.),
     }
   }
 
@@ -289,7 +300,14 @@ impl ParamSource {
         }
       },
       ParamSource::ParamBuffer(buffer_ix) => {
-        let param_buf = unsafe { param_buffers.get_unchecked(*buffer_ix) };
+        // the standalone FX context has fewer param buffers than the main synth
+        let param_buf = match param_buffers.get(*buffer_ix) {
+          Some(buf) => buf,
+          None => {
+            output_buf.fill(0.);
+            return;
+          },
+        };
         let base_input_ptr = param_buf.as_ptr() as *const v128;
         let base_output_ptr = output_buf.as_ptr() as *mut v128;
         for i in 0..FRAME_SIZE / 4 {
@@ -322,10 +340,15 @@ impl ParamSource {
         scale,
         shift,
       }) => {
+        let adsr = match adsrs.get(*adsr_ix) {
+          Some(adsr) => adsr,
+          None => {
+            output_buf.fill(*shift);
+            return;
+          },
+        };
         let scale = f32x4_splat(*scale);
         let shift = f32x4_splat(*shift);
-
-        let adsr = unsafe { adsrs.get_unchecked(*adsr_ix) };
         let base_output_ptr = output_buf.as_ptr() as *mut v128;
         let adsr_buf_ptr = adsr.get_cur_frame_output().as_ptr() as *const v128;
 
@@ -385,7 +408,7 @@ impl ParamSource {
         for i in 0..FRAME_SIZE {
           let new_val = if samples_since_last_update_local >= update_interval_samples {
             samples_since_last_update_local = 1;
-            let new_target_val = common::rng().gen_range(min, max);
+            let new_target_val = gen_random(min, max);
             target_val.set(new_target_val);
             new_target_val
           } else {
@@ -433,8 +456,9 @@ impl ParamSource {
           last_val.set(state);
         }
       },
-      ParamSource::ParamBuffer(buffer_ix) => {
-        output_buf.clone_from_slice(unsafe { param_buffers.get_unchecked(*buffer_ix) });
+      ParamSource::ParamBuffer(buffer_ix) => match param_buffers.get(*buffer_ix) {
+        Some(buf) => output_buf.clone_from_slice(buf),
+        None => output_buf.fill(0.),
       },
       ParamSource::BaseFrequencyMultiplier {
         multiplier,
@@ -451,7 +475,13 @@ impl ParamSource {
         scale,
         shift,
       }) => {
-        let adsr = unsafe { adsrs.get_unchecked(*adsr_ix) };
+        let adsr = match adsrs.get(*adsr_ix) {
+          Some(adsr) => adsr,
+          None => {
+            output_buf.fill(*shift);
+            return;
+          },
+        };
         let adsr_buf = adsr.get_cur_frame_output();
 
         for i in 0..FRAME_SIZE {
@@ -502,7 +532,7 @@ impl ParamSource {
         for i in 0..FRAME_SIZE {
           let new_val = if samples_since_last_update_local >= update_interval_samples {
             samples_since_last_update_local = 1;
-            let new_target_val = common::rng().gen_range(min, max);
+            let new_target_val = gen_random(min, max);
             target_val.set(new_target_val);
             new_target_val
           } else {

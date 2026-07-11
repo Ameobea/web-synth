@@ -269,7 +269,7 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
 }) => {
   const { dispatch, actionCreators } = getSynthDesignerReduxInfra(stateKey);
   const filterEnvelope = useMemo(
-    (): ADSRWithOutputRange => ({ ...synth.filterEnvelope, outputRange: [20, 20_000] as const }),
+    (): ADSRWithOutputRange => ({ ...synth.filterEnvelope, outputRange: [20, 22_050] as const }),
     [synth.filterEnvelope]
   );
   const getFMSynthOutput = useCallback(async () => {

@@ -106,6 +106,7 @@ export type EffectInner =
       modulationDepth: ParamSource;
       wet: ParamSource;
       dry: ParamSource;
+      /** consumed by the engine as radians/sec; effective LFO frequency is `value / 2π` Hz */
       lfoRate: ParamSource;
     };
 

@@ -109,12 +109,14 @@ export class WavetableConfiguratorWorker {
         throw new Error('NaN in waveform samples');
       }
 
-      // Normalize
+      // Normalize; an all-zero waveform must not divide by zero
       const max = Math.max(...waveformSamples);
       const min = Math.min(...waveformSamples);
       const absMax = Math.max(Math.abs(max), Math.abs(min));
-      for (let j = 0; j < waveformSamples.length; j++) {
-        waveformSamples[j] /= absMax;
+      if (absMax > 0) {
+        for (let j = 0; j < waveformSamples.length; j++) {
+          waveformSamples[j] /= absMax;
+        }
       }
 
       renderedWavetable.push(waveformSamples);

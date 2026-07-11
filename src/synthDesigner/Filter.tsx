@@ -64,7 +64,7 @@ const FilterEnvelopeControls: React.FC<FilterEnvelopeControlsProps> = ({
               debugName: 'No audio thread data in synth designer `filterEnvelope`',
             }
           ),
-          outputRange: [20, 20_000],
+          outputRange: [20, 22_050],
           logScale: true,
         },
         Comp: ADSRControlsComp,

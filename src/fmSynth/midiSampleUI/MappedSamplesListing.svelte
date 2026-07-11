@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  const MIDI_NOTE_RANGE = new Array(100).fill(null).map((_, i) => i);
+  const MIDI_NOTE_RANGE = new Array(128).fill(null).map((_, i) => i);
 </script>
 
 <script lang="ts">

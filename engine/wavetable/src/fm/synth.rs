@@ -60,11 +60,11 @@ const VOICE_COUNT: usize = 32;
 
 #[no_mangle]
 pub unsafe extern "C" fn fm_synth_set_midi_control_value(index: usize, value: usize) {
-  if index >= MAX_MIDI_CONTROL_VALUE_COUNT || value > 127 {
-    panic!();
+  if index >= MAX_MIDI_CONTROL_VALUE_COUNT {
+    return;
   }
 
-  MIDI_CONTROL_VALUES[index] = (value as f32) / 127.;
+  MIDI_CONTROL_VALUES[index] = (value.min(127) as f32) / 127.;
 }
 
 #[derive(Clone)]
@@ -734,7 +734,9 @@ impl OscillatorSource {
       ),
       OscillatorSource::SampleMapping(emitter) =>
         emitter.gen_sample(midi_number, sample_mapping_config),
-      OscillatorSource::TunedSample(_) => todo!(),
+      // tuned sample playback is unimplemented; emit silence rather than panicking the audio
+      // thread if an old preset selects it
+      OscillatorSource::TunedSample(_) => 0.,
       OscillatorSource::WhiteNoise(emitter) => emitter.gen_sample(),
     }
   }
@@ -850,7 +852,9 @@ impl OscillatorSource {
       ),
       OscillatorSource::SampleMapping(emitter) =>
         emitter.gen_sample(midi_number, sample_mapping_config),
-      OscillatorSource::TunedSample(_) => todo!(),
+      // tuned sample playback is unimplemented; emit silence rather than panicking the audio
+      // thread if an old preset selects it
+      OscillatorSource::TunedSample(_) => 0.,
       OscillatorSource::WhiteNoise(emitter) => emitter.gen_sample(),
     }
   }
@@ -1118,8 +1122,14 @@ impl FMSynthVoice {
     for operator_ix in 0..OPERATOR_COUNT {
       let operator = unsafe { self.operators.get_unchecked_mut(operator_ix) };
       if !operator.enabled {
+        // these buffers start out uninitialized and disabled operators' slots are never written
+        // in the sample loop.  They're still read by `compute_modulated_frequency` and multiplied
+        // by the (zero) cached modulation indices - fine unless the garbage is NaN/Inf.
         last_samples_per_operator[operator_ix] = 0.;
         last_frequencies_per_operator[operator_ix] = 0.;
+        samples_per_operator[operator_ix] = 0.;
+        frequencies_per_operator[operator_ix] = 0.;
+        operator_base_frequencies[operator_ix] = [0.; FRAME_SIZE];
         continue;
       }
 
@@ -1782,6 +1792,8 @@ fn build_oscillator_source(
   param_4_val_float_3: f32,
   old_phases: &[f32],
 ) -> OscillatorSource {
+  // a single-oscillator unison divides by zero when spacing detune steps
+  let unison = unison.max(2);
   match operator_type {
     0 => OscillatorSource::Wavetable(WaveTableHandle {
       wavetable_index: param_0_val_int,
@@ -1808,7 +1820,7 @@ fn build_oscillator_source(
         param_3_val_float_3,
       ),
     }),
-    1 => OscillatorSource::ParamBuffer(param_0_val_int),
+    1 => OscillatorSource::ParamBuffer(param_0_val_int.min(MAX_PARAM_BUFFERS - 1)),
     2 => OscillatorSource::Sine(SineOscillator {
       phase: old_phases.get(0).copied().unwrap_or_default(),
     }),
@@ -1946,7 +1958,11 @@ fn build_oscillator_source(
         unison
       ]),
     )),
-    _ => panic!("Invalid operator type: {}", operator_type),
+    // unknown/unsupported operator types (e.g. unison variants of oscillators that don't support
+    // it, grafted on by legacy presets) fall back to a plain sine rather than panicking
+    _ => OscillatorSource::Sine(SineOscillator {
+      phase: old_phases.get(0).copied().unwrap_or_default(),
+    }),
   }
 }
 
@@ -1983,6 +1999,9 @@ pub unsafe extern "C" fn fm_synth_set_operator_config(
   param_4_val_float_2: f32,
   param_4_val_float_3: f32,
 ) {
+  if operator_ix >= OPERATOR_COUNT {
+    return;
+  }
   for voice in &mut *(*ctx).voices {
     let operator = &mut voice.operators[operator_ix];
     let old_phases = operator.oscillator_source.get_phase();

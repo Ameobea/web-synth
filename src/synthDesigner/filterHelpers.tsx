@@ -241,6 +241,8 @@ export const getSettingsForFilterType = ({
   );
 };
 
+// `gain` is only a visible setting for shelf/peaking types, but it's serialized and sent to the
+// engine for every filter type; leaving it undefined turns into NaN on the audio thread
 export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
   getSettingsForFilterType({
     filterType,
@@ -248,4 +250,6 @@ export const getDefaultFilterParams = (filterType: FilterType): FilterParams =>
     includeBypass: false,
     vcId: undefined,
     adsrDebugName: 'getDefaultFilterParams SHOULD NOT SHOW UP',
-  }).reduce((acc, { label, initial }) => ({ ...acc, [label]: initial }), {}) as FilterParams;
+  }).reduce((acc, { label, initial }) => ({ ...acc, [label]: initial }), {
+    gain: 0,
+  }) as FilterParams;

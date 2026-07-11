@@ -86,7 +86,21 @@ pub struct ComputeGridFilterParams<T: Float + FloatConst + Default> {
 
 impl<T: Float + FloatConst + Default + MulAssign + AddAssign> BiquadFilter<T> {
   #[inline]
-  pub fn compute_coefficients(mode: FilterMode, mut q: T, freq: T, gain: T) -> (T, T, T, T, T) {
+  pub fn compute_coefficients(mode: FilterMode, q: T, freq: T, gain: T) -> (T, T, T, T, T) {
+    // NaN params would poison the filter's state permanently; gain beyond ±120dB overflows the
+    // shelf/peak coefficient math in f32, and dB-interpreted q beyond ±700 makes `10^(q/20)`
+    // hit 0/Inf
+    let freq = if freq.is_nan() { T::zero() } else { freq };
+    let mut q = crate::clamp(
+      T::from(-700.).unwrap(),
+      T::from(700.).unwrap(),
+      if q.is_nan() { T::zero() } else { q },
+    );
+    let gain = crate::clamp(
+      T::from(-120.).unwrap(),
+      T::from(120.).unwrap(),
+      if gain.is_nan() { T::zero() } else { gain },
+    );
     // From: https://webaudio.github.io/web-audio-api/#filters-characteristics
     let computed_frequency =
       crate::clamp::<T>(T::from(10.).unwrap(), T::from(21_830.).unwrap(), freq);

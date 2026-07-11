@@ -464,6 +464,16 @@ export default class FMSynth implements ForeignNode {
             this.filterEnvelope.audioThreadData.buffer = this.audioThreadDataBuffer!;
           }
 
+          // Any wavetable data recorded before the wasm was ready was dropped by the AWP;
+          // clear the dedup record so the replay below re-sends it
+          this.lastSetWavetableData = {
+            wavetableIx: -1,
+            waveformsPerDimension: -1,
+            waveformLength: -1,
+            baseFrequency: -1,
+            samples: new Float32Array(0),
+          };
+
           // Initialize backend with all effects and modulation indices that were deserialized
           this.operatorConfigs.forEach((config, opIx) =>
             this.handleOperatorConfigChange(opIx, config)
@@ -486,6 +496,9 @@ export default class FMSynth implements ForeignNode {
           this.setFilterBypassed(this.filterBypassed);
           this.setFilterParams(this.filterParams);
           this.setMasterGain(this.masterGain);
+          Object.entries(this.midiControlValuesCache.serialize()).forEach(
+            ([controlIndex, controlValue]) => this.setMIDIControlValue(+controlIndex, controlValue)
+          );
           this.sampleMappingStore.subscribe(this.handleSampleMappingStateChange);
 
           this.isInitialized = true;
@@ -642,9 +655,11 @@ export default class FMSynth implements ForeignNode {
             return { param1: encodeParamSource(config.stretchFactor) };
           case 'wavetable':
             return {
+              // -1 if the bank isn't loaded; the engine emits silence for missing indices
               param1: {
-                valParamInt:
-                  this.wavetableBackendIxByName.findIndex(x => x === config.wavetableName) ?? 1000,
+                valParamInt: this.wavetableBackendIxByName.findIndex(
+                  x => x === config.wavetableName
+                ),
               },
               param2: encodeParamSource(config.dim0IntraMix),
               param3: encodeParamSource(config.dim1IntraMix),
@@ -993,11 +1008,17 @@ export default class FMSynth implements ForeignNode {
     if (params.onInitialized) {
       this.onInitializedCBs.push(params.onInitialized);
     }
+    // legacy serialized states can contain interior nulls in effect chains; the engine compacts
+    // chains on delete, so an un-compacted mirror would desync effect indices on replay
+    const compactEffectChain = (chain: (Effect | null)[]): (Effect | null)[] => {
+      const compacted = chain.filter((e): e is Effect => e !== null && e !== undefined);
+      return [...compacted, ...new Array(chain.length - compacted.length).fill(null)];
+    };
     if (params.operatorEffects) {
-      this.operatorEffects = params.operatorEffects;
+      this.operatorEffects = (params.operatorEffects as (Effect | null)[][]).map(compactEffectChain);
     }
     if (params.mainEffectChain) {
-      this.mainEffectChain = params.mainEffectChain;
+      this.mainEffectChain = compactEffectChain(params.mainEffectChain);
     }
     if (params.selectedUI) {
       this.selectedUI = params.selectedUI;

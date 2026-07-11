@@ -48,15 +48,17 @@ impl Effect for ChorusEffect {
       dsp::clamp(0., 1., unsafe { *rendered_params.get_unchecked(2) }),
       0.95,
     );
-    let lfo_rate_hz = dsp::smooth(
+    let lfo_rate = dsp::smooth(
       &mut self.last_lfo_rate,
       dsp::clamp(0., 20., unsafe { *rendered_params.get_unchecked(3) }),
       0.95,
     );
 
-    // Update LFO phases
+    // Update LFO phases.  The rate param is consumed as radians/sec, so the effective LFO
+    // frequency is `rate / 2π` Hz.  This is a long-standing unit mismatch that's kept as-is
+    // because existing compositions have rates calibrated to it.
     for i in 0..NUM_TAPS {
-      self.lfo_phases[i] += lfo_rate_hz / SAMPLE_RATE as f32;
+      self.lfo_phases[i] += lfo_rate / SAMPLE_RATE as f32;
       if self.lfo_phases[i] > TWO_PI {
         self.lfo_phases[i] -= TWO_PI;
       }
@@ -67,7 +69,10 @@ impl Effect for ChorusEffect {
       let lfo = phase.sin();
       // scale from [-1, 1] to [0, 1]
       let lfo = (lfo + 1.) / 2.;
-      let delay_samples = (MAX_CHORUS_DELAY_SAMPLES as f32) * depth * lfo;
+      // at full depth + LFO peak this hits exactly buffer length, which would wrap the read
+      // around to the newest sample
+      let delay_samples = ((MAX_CHORUS_DELAY_SAMPLES as f32) * depth * lfo)
+        .min((MAX_CHORUS_DELAY_SAMPLES - 2) as f32);
       chorus_sample += self.buffer.read_interpolated(-delay_samples);
     }
 

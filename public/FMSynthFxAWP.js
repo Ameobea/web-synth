@@ -54,6 +54,13 @@ class FMSynthFxAWP extends AudioWorkletProcessor {
     this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
   }
 
+  getWasmMemoryBuffer() {
+    if (this.wasmMemoryBuffer?.buffer !== this.wasmInstance.exports.memory.buffer) {
+      this.wasmMemoryBuffer = new Float32Array(this.wasmInstance.exports.memory.buffer);
+    }
+    return this.wasmMemoryBuffer;
+  }
+
   handleMessage(data) {
     switch (data.type) {
       case 'setWasmBytes': {
@@ -98,7 +105,7 @@ class FMSynthFxAWP extends AudioWorkletProcessor {
         break;
       }
       default: {
-        console.error('Unhandled message type in FM synth FX AWP: ', evt.data.type);
+        console.error('Unhandled message type in FM synth FX AWP: ', data.type);
       }
     }
   }
@@ -108,6 +115,7 @@ class FMSynthFxAWP extends AudioWorkletProcessor {
 
     this.isShutdown = false;
     this.ctxPtr = 0;
+    this.wasmMemoryBuffer = null;
     this.port.onmessage = evt => this.handleMessage(evt.data);
   }
 

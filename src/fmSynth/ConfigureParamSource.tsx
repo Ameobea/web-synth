@@ -56,7 +56,8 @@ const ADSRLengthTypePicker: React.FC<ADSRLengthTypePickerProps> = ({ value, onCh
           const nowIsMilliseconds = millisecondsToggled ? val[0] : !val[1];
 
           if (nowIsMilliseconds) {
-            onChange({ type: 'constant', value: 1000 });
+            // constant length params are in samples
+            onChange({ type: 'constant', value: msToSamples(1000) });
           } else {
             onChange({ type: 'beats to samples', value: 1 });
           }

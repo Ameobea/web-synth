@@ -57,7 +57,9 @@ impl MoogFilter {
   }
 }
 
-fn tanh(x: f32) -> f32 { fastapprox::fast::tanh(x) }
+// `fastapprox::fast::tanh` returns wrong-signed values below x≈-44 (and +1 for NaN); clamping to
+// ±20 is safely inside its accurate range and real tanh is fully saturated there anyway
+fn tanh(x: f32) -> f32 { fastapprox::fast::tanh(dsp::clamp(-20., 20., x)) }
 
 impl Effect for MoogFilter {
   fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
@@ -189,5 +191,12 @@ impl Effect for MoogFilter {
     buf[0] = Some(&mut self.cutoff);
     buf[1] = Some(&mut self.resonance);
     buf[2] = Some(&mut self.drive);
+  }
+
+  fn reset(&mut self) {
+    self.V = [0.; 4];
+    self.dV = [0.; 4];
+    self.tV = [0.; 4];
+    self.last_sample = 0.;
   }
 }

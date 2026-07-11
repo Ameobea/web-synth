@@ -7,6 +7,8 @@ pub struct DCBlocker {
 }
 
 impl DCBlocker {
+  pub fn reset(&mut self) { *self = Self::default(); }
+
   pub fn apply(&mut self, sample: f32) -> f32 {
     let out = sample - self.last_input + 0.9975 * self.last_output;
     self.last_input = sample;

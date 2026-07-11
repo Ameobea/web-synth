@@ -48,11 +48,11 @@ pub fn clamp<T: Float>(min: T, max: T, val: T) -> T {
   }
 }
 
-/// Same as `clamp()` but converts infinite, subnormal, and NaN values to `0`.
+/// Same as `clamp()` but converts infinite, subnormal, and NaN values to `0` before clamping.
 #[inline]
 pub fn clamp_normalize(min: f32, max: f32, val: f32) -> f32 {
   if !val.is_normal() {
-    return val;
+    return clamp(min, max, 0.);
   }
   clamp(min, max, val)
 }

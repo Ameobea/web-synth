@@ -36,5 +36,8 @@ impl Effect for Delay {
     self.dc_blocker.apply(sample)
   }
 
-  fn reset(&mut self) { self.buffer.fill(0.); }
+  fn reset(&mut self) {
+    self.buffer.fill(0.);
+    self.dc_blocker.reset();
+  }
 }

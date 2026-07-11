@@ -23,18 +23,25 @@
 
   interface Props {
     mappedSampleData: MappedSampleData;
+    onChange: (newMappedSampleData: MappedSampleData) => void;
     onDelete: () => void;
   }
 
-  let { mappedSampleData = $bindable(), onDelete }: Props = $props();
+  let { mappedSampleData, onChange, onDelete }: Props = $props();
 
   let selectedSampleLength = $state(0);
 
   $effect(() => {
     if (mappedSampleData.descriptor) {
+      let cancelled = false;
       getSample(mappedSampleData.descriptor).then(sample => {
-        selectedSampleLength = sample.length;
+        if (!cancelled) {
+          selectedSampleLength = sample.length;
+        }
       });
+      return () => {
+        cancelled = true;
+      };
     } else {
       selectedSampleLength = 0;
     }
@@ -54,14 +61,13 @@
   const handleControlPanelChange = (key: string, value: any, _state: Record<string, any>) => {
     switch (key) {
       case 'gain':
-        mappedSampleData.gain = value;
+        onChange({ ...mappedSampleData, gain: value });
         break;
       case 'playback rate':
-        mappedSampleData.playbackRate = value;
+        onChange({ ...mappedSampleData, playbackRate: value });
         break;
       case 'range (samples)':
-        mappedSampleData.startIx = value[0];
-        mappedSampleData.endIx = value[1];
+        onChange({ ...mappedSampleData, startIx: value[0], endIx: value[1] });
         break;
       default:
         console.error('Unknown key', key);
@@ -82,7 +88,7 @@
       onclick={async () => {
         try {
           const selectedSample = await selectSample();
-          mappedSampleData.descriptor = selectedSample;
+          onChange({ ...mappedSampleData, descriptor: selectedSample });
           // TODO: Deal with load status??
         } catch (err) {
           // pass
@@ -93,7 +99,12 @@
     </button>
     <button style="margin-left: 8px;" onclick={onDelete}>Delete</button>
     <label class="loop-checkbox-label" for={checkboxID}>Loop</label>
-    <input id={checkboxID} type="checkbox" bind:checked={mappedSampleData.doLoop} />
+    <input
+      id={checkboxID}
+      type="checkbox"
+      checked={mappedSampleData.doLoop}
+      onchange={evt => onChange({ ...mappedSampleData, doLoop: evt.currentTarget.checked })}
+    />
     {#if mappedSampleData.descriptor}
       <SvelteControlPanel
         settings={mappedSampleControlPanelSettings}

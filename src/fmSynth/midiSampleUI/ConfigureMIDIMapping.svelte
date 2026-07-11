@@ -19,7 +19,10 @@
   <div class="mapped-samples-container">
     {#each mappedSamples as _, i}
       <ConfigureMappedSample
-        bind:mappedSampleData={mappedSamples[i]}
+        mappedSampleData={mappedSamples[i]}
+        onChange={newMappedSampleData => {
+          mappedSamples = R.update(i, newMappedSampleData, mappedSamples);
+        }}
         onDelete={() => {
           mappedSamples = R.remove(i, 1, mappedSamples);
         }}

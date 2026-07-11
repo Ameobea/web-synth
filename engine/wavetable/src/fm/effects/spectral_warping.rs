@@ -52,7 +52,7 @@ impl Effect for SpectralWarping {
     let stretch_factor = unsafe { *rendered_params.get_unchecked(1) };
     // We look back half of the wavelength of the frequency.
     let base_lookback_samples = ((SAMPLE_RATE as f32) / frequency) / 2.;
-    if !base_lookback_samples.is_normal() {
+    if !base_lookback_samples.is_finite() {
       return sample;
     }
 
@@ -61,7 +61,10 @@ impl Effect for SpectralWarping {
     debug_assert!(phase_warp_diff >= -1.);
     debug_assert!(phase_warp_diff <= 1.);
     let lookback_samples = base_lookback_samples + (base_lookback_samples * phase_warp_diff);
-    debug_assert!(lookback_samples >= 0.);
+    // negative frequency yields a negative lookback; `.min`/`.max` also scrub NaN
+    let lookback_samples = lookback_samples
+      .min((SPECTRAL_WARPING_BUFFER_SIZE - 2) as f32)
+      .max(0.);
 
     self.buffer.read_interpolated(-lookback_samples)
   }
@@ -69,5 +72,10 @@ impl Effect for SpectralWarping {
   fn get_params<'a>(&'a mut self, buf: &mut [Option<&'a mut ParamSource>; 4]) {
     buf[0] = Some(&mut self.frequency);
     buf[1] = Some(&mut self.osc.stretch_factor);
+  }
+
+  fn reset(&mut self) {
+    self.buffer.fill(0.);
+    self.osc.phase = 0.;
   }
 }

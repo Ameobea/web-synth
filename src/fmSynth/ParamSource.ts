@@ -32,12 +32,6 @@ export type ParamSource =
   | {
       type: 'midi control';
       midiControlIndex: 'LEARNING';
-      /**
-       * If we're in this state, this node is connected as the destination to the MIDI node
-       * controlling the FM synth.  We use this to intercept generic control events so we know
-       * which control index to associate/learn
-       */
-      dstMIDINode: MIDINode;
       scale: number;
       shift: number;
     }
@@ -49,6 +43,18 @@ export type ParamSource =
       smoothingCoefficient: number;
       updateIntervalSamples: number;
     };
+
+// The MIDI node connected while learning a control mapping lives here rather than inside the
+// `ParamSource` state; it's a live object with circular references, and storing it in the state
+// made `JSON.stringify` throw when a composition was saved mid-learn
+let activeMIDILearning: { midiNode: MIDINode; dstMIDINode: MIDINode } | null = null;
+
+const cancelActiveMIDILearning = () => {
+  if (activeMIDILearning) {
+    activeMIDILearning.midiNode.disconnect(activeMIDILearning.dstMIDINode);
+    activeMIDILearning = null;
+  }
+};
 
 export const buildDefaultParamSource = (
   type: ParamSource['type'],
@@ -337,8 +343,8 @@ export const buildConfigureParamSourceSettings = ({
             }
 
             if (state.midiControlIndex === 'LEARNING') {
-              midiNode.disconnect(state.dstMIDINode);
-              onChange({ ...state, midiControlIndex: null, dstMIDINode: undefined });
+              cancelActiveMIDILearning();
+              onChange({ ...state, midiControlIndex: null });
             } else {
               const cbs: MIDIInputCbs = {
                 onAttack: () => {
@@ -356,21 +362,19 @@ export const buildConfigureParamSourceSettings = ({
                 onGenericControl: (controlIndex, _controlValue) => {
                   console.log('Assigning MIDI control index: ', controlIndex);
 
-                  onChange({
-                    ...state,
-                    midiControlIndex: controlIndex,
-                    dstMIDINode: undefined,
-                  });
+                  onChange({ ...state, midiControlIndex: controlIndex });
                   midiNode.disconnect(dstMIDINode);
+                  if (activeMIDILearning?.dstMIDINode === dstMIDINode) {
+                    activeMIDILearning = null;
+                  }
                 },
               };
+              // only one learn can be in progress at a time; starting a new one cancels the last
+              cancelActiveMIDILearning();
               const dstMIDINode = new MIDINode(() => cbs);
               midiNode.connect(dstMIDINode);
-              onChange({
-                ...state,
-                midiControlIndex: 'LEARNING' as const,
-                dstMIDINode,
-              });
+              activeMIDILearning = { midiNode, dstMIDINode };
+              onChange({ ...state, midiControlIndex: 'LEARNING' as const });
             }
           },
         },

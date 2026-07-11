@@ -69,7 +69,7 @@ impl FilterParamControlSource {
       0 => FilterParamControlSource::Manual,
       1 => FilterParamControlSource::Envelope,
       2 => FilterParamControlSource::Buffer,
-      _ => panic!("Invalid filter param control source: {}", val),
+      _ => FilterParamControlSource::Manual,
     }
   }
 
@@ -86,10 +86,8 @@ impl FilterParamControlSource {
             shift: filter_adsr_shift,
           })
         } else {
-          panic!(
-            "Only cutoff frequency supports ADSR param source, but it was provided for \
-             {param_type:?}"
-          );
+          // only cutoff frequency supports envelope control
+          ParamSource::new_constant(manual_val)
         },
       FilterParamControlSource::Buffer => ParamSource::ParamBuffer(param_type as usize),
     }

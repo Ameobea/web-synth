@@ -21,6 +21,17 @@ pub enum SoftClipperAlgorithm {
 }
 
 impl SoftClipperAlgorithm {
+  pub fn from_usize(val: usize) -> Self {
+    match val {
+      0 => Self::CubicNonlinearity,
+      1 => Self::Tanh,
+      2 => Self::XOverOnePlusAbsX,
+      3 => Self::HardClipper,
+      4 => Self::BramWaveShaper,
+      _ => Self::CubicNonlinearity,
+    }
+  }
+
   pub fn needs_pre_gain(&self) -> bool {
     match self {
       SoftClipperAlgorithm::CubicNonlinearity => true,
@@ -47,7 +58,8 @@ impl SoftClipperAlgorithm {
       SoftClipperAlgorithm::XOverOnePlusAbsX => sample / (1. + sample.abs()),
       SoftClipperAlgorithm::HardClipper => dsp::clamp(-1., 1., sample),
       SoftClipperAlgorithm::BramWaveShaper => {
-        let a = gain_param;
+        // negative `a` can zero the denominator
+        let a = gain_param.max(0.);
         let abs_sample = sample.abs();
         (sample * (abs_sample + a)) / (sample * sample + (a - 1.) * abs_sample + 1.)
       },
@@ -80,7 +92,7 @@ impl SoftClipperAlgorithm {
         },
       SoftClipperAlgorithm::BramWaveShaper =>
         for (sample, gain) in samples.iter_mut().zip(gains.iter()) {
-          let a = *gain;
+          let a = gain.max(0.);
           let abs_sample = sample.abs();
           *sample = (*sample * (abs_sample + a)) / (*sample * *sample + (a - 1.) * abs_sample + 1.);
         },
@@ -110,7 +122,7 @@ impl SoftClipper {
       post_gain,
       mix,
       dc_blocker: DCBlocker::default(),
-      algorithm: unsafe { std::mem::transmute(algorithm as u32) },
+      algorithm: SoftClipperAlgorithm::from_usize(algorithm),
       scratch: [0.; FRAME_SIZE],
     }
   }
@@ -172,4 +184,6 @@ impl Effect for SoftClipper {
     buf[1] = Some(&mut self.post_gain);
     buf[2] = Some(&mut self.mix);
   }
+
+  fn reset(&mut self) { self.dc_blocker.reset(); }
 }

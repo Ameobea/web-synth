@@ -26,9 +26,10 @@ impl Default for Wavecruncher {
 impl Effect for Wavecruncher {
   fn apply(&mut self, rendered_params: &[f32], _base_frequency: f32, sample: f32) -> f32 {
     let top_fold_position = unsafe { *rendered_params.get_unchecked(0) };
-    let top_fold_width = unsafe { *rendered_params.get_unchecked(1) };
+    // zero width produces `Inf.trunc() * 0. = NaN`; `.max()` also scrubs NaN/negative widths
+    let top_fold_width = unsafe { *rendered_params.get_unchecked(1) }.max(0.001);
     let bottom_fold_position = unsafe { *rendered_params.get_unchecked(2) };
-    let bottom_fold_width = unsafe { *rendered_params.get_unchecked(3) };
+    let bottom_fold_width = unsafe { *rendered_params.get_unchecked(3) }.max(0.001);
 
     let folded_sample = if sample > 0. {
       let fold_position = dsp::clamp(0., 1., top_fold_position);
@@ -132,4 +133,6 @@ impl Effect for Wavefolder {
     buf[1] = Some(&mut self.offset);
     buf[2] = Some(&mut self.mix);
   }
+
+  fn reset(&mut self) { self.dc_blocker.reset(); }
 }

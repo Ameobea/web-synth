@@ -325,12 +325,20 @@ class FMSynthAWP extends AudioWorkletProcessor {
           break;
         }
         case 'setSampleMappingState': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set sample mapping state before Wasm instance loaded');
+            break;
+          }
           const { stateByOperatorIx } = evt.data.sampleMappingState;
           this.lastStateByOperatorIx = stateByOperatorIx;
           this.setSampleMappingState(stateByOperatorIx);
           break;
         }
         case 'setSample': {
+          if (!this.wasmInstance) {
+            console.warn('Tried to set sample before Wasm instance loaded');
+            break;
+          }
           const { descriptor, data } = evt.data;
           const descriptorHash = hashSampleDescriptor(descriptor);
           if (this.sampleDataIxByHashedSampleDescriptor.has(descriptorHash)) {
@@ -715,7 +723,7 @@ class FMSynthAWP extends AudioWorkletProcessor {
 
     const outputsPtr = this.wasmInstance.exports.fm_synth_generate(
       this.ctxPtr,
-      globalThis.globalTempoBPM,
+      globalThis.globalTempoBPM || 120,
       // TODO: This causes things to sound weird when using filter envelope with beat length mode.
       //
       // Should probably investigate why that's happening and fix it at some point

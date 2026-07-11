@@ -39,7 +39,9 @@ impl SampleMappingEmitter {
         *phase += (1. / len as f32) * playback_rate;
         if *phase >= 1. {
           if *do_loop {
-            *phase -= 1.;
+            // `fract` rather than `-= 1.`: playback rates above 2x the region length can
+            // overshoot a full cycle, and a phase left >= 1 reads past the region slice
+            *phase = phase.fract();
           } else {
             *phase = -1000.;
           }
@@ -101,19 +103,20 @@ impl MappedSampleData {
     end_ix: usize,
     playback_rate: f32,
   ) -> Self {
-    let (sample, start_ix, end_ix) = if sample_ix < 0 {
-      (None, 0, 0)
-    } else {
-      let sample = sample_manager().samples[sample_ix as usize].as_slice();
-      (
-        Some(sample),
-        start_ix.min(sample.len()),
-        if end_ix == 0 {
+    let (sample, start_ix, end_ix) = match usize::try_from(sample_ix)
+      .ok()
+      .and_then(|ix| sample_manager().samples.get(ix))
+    {
+      None => (None, 0, 0),
+      Some(sample) => {
+        let sample = sample.as_slice();
+        let end_ix = if end_ix == 0 {
           sample.len()
         } else {
           end_ix.min(sample.len())
-        },
-      )
+        };
+        (Some(sample), start_ix.min(end_ix), end_ix)
+      },
     };
 
     MappedSampleData {

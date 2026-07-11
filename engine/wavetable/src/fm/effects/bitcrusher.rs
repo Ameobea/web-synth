@@ -71,4 +71,9 @@ impl Effect for Bitcrusher {
     buf[1] = Some(&mut self.bit_depth);
     buf[2] = Some(&mut self.mix);
   }
+
+  fn reset(&mut self) {
+    self.samples_since_last_sample = 0;
+    self.held_sample = 0.;
+  }
 }

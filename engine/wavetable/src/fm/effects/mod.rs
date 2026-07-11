@@ -8,7 +8,7 @@ use dsp::{
   uninit, FRAME_SIZE,
 };
 use rand::Rng;
-use soft_clipper::SoftClipper;
+use soft_clipper::{SoftClipper, SoftClipperAlgorithm};
 use spectral_warping::SpectralWarpingParams;
 
 use crate::fm::effects::comb_filter::CombFilter;
@@ -617,7 +617,7 @@ impl EffectInstance {
           param_3_float_val_2,
           param_3_float_val_3,
         ));
-        soft_clipper.algorithm = unsafe { std::mem::transmute(param_4_int_val as u32) };
+        soft_clipper.algorithm = SoftClipperAlgorithm::from_usize(param_4_int_val);
         return true;
       },
       5 => {

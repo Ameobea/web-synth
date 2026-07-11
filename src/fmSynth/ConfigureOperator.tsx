@@ -29,7 +29,6 @@ import {
   type WavetableState,
 } from 'src/fmSynth/operatorConfig';
 
-
 interface ConfigureWavetableIndexProps {
   selectedWavetableName: string | null;
   wavetableState: WavetableState;
@@ -273,7 +272,7 @@ const OperatorTypeSettings = [
   },
 ];
 
-const OperatorUnisonSettings = [{ type: 'range', label: 'unison', min: 0, max: 32, step: 1 }];
+const OperatorUnisonSettings = [{ type: 'range', label: 'unison', min: 1, max: 32, step: 1 }];
 
 const ConfigureSampleMapping = mkSvelteComponentShim<{
   store: Writable<SampleMappingState>;
@@ -373,8 +372,13 @@ const ConfigureOperator: React.FC<ConfigureOperatorProps> = ({
           switch (key) {
             case 'operator type': {
               const newOperator = buildDefaultOperatorConfig(val as OperatorConfig['type']);
-              (newOperator as any).frequency =
-                (operatorTypeState as any).frequency ?? (config as any).frequency;
+              // carry the frequency over when both old + new types have one; switching through a
+              // frequency-less type (white noise etc.) must not stomp the fresh default with
+              // `undefined`, which kills the audio thread when encoded
+              const oldFrequency = (config as any).frequency;
+              if (oldFrequency !== undefined && 'frequency' in newOperator) {
+                (newOperator as any).frequency = oldFrequency;
+              }
               onChange(newOperator);
               break;
             }

@@ -52,4 +52,6 @@ impl Effect for BiquadFilterEffect {
       samples,
     );
   }
+
+  fn reset(&mut self) { self.inner.reset(); }
 }

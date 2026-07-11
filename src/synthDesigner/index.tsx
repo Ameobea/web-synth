@@ -12,6 +12,7 @@ import buildSynthDesignerRedux, {
   serializeSynthModule,
   SynthDesignerStateByStateKey,
   type SynthDesignerState,
+  type SynthModule,
 } from 'src/redux/modules/synthDesigner';
 import type { WavyJones } from 'src/visualizations/WavyJones';
 import { UnreachableError } from 'src/util';
@@ -61,17 +62,25 @@ export const init_synth_designer = (stateKey: string) => {
   const initialState: SynthDesignerState | null = Try.of(() =>
     Option.of(localStorage.getItem(stateKey))
       .map(serializedState => JSON.parse(serializedState))
-      .map(
-        ({ synths, ...rest }) =>
-          ({
-            synths: (synths as any[]).map((synth, i) =>
-              deserializeSynthModule(undefined, synth, stateKey, i)
-            ),
-            spectrumNode: new AnalyserNode(new AudioContext()),
-            ...rest,
-            isHidden: false,
-          }) as SynthDesignerState
-      )
+      .map(({ synths, ...rest }) => {
+        // if a later voice fails to deserialize, dispose the already-built ones so their AWPs
+        // don't leak as live zombie audio nodes after we fall back to the initial state
+        const builtSynths: SynthModule[] = [];
+        try {
+          (synths as any[]).forEach((synth, i) =>
+            builtSynths.push(deserializeSynthModule(undefined, synth, stateKey, i))
+          );
+        } catch (err) {
+          builtSynths.forEach(disposeSynthModule);
+          throw err;
+        }
+        return {
+          synths: builtSynths,
+          spectrumNode: new AnalyserNode(new AudioContext()),
+          ...rest,
+          isHidden: false,
+        } as SynthDesignerState;
+      })
       .orNull()
   )
     .recoverWith(err => {
