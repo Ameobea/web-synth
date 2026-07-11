@@ -8,6 +8,7 @@ use common::ref_static_mut;
 use dsp::{FRAME_SIZE, SAMPLE_RATE};
 use rand::Rng;
 
+pub const MAX_PARAM_BUFFERS: usize = 8;
 pub const MAX_MIDI_CONTROL_VALUE_COUNT: usize = 1024;
 pub static mut MIDI_CONTROL_VALUES: [f32; MAX_MIDI_CONTROL_VALUE_COUNT] =
   [0.; MAX_MIDI_CONTROL_VALUE_COUNT];
@@ -235,7 +236,7 @@ impl ParamSource {
     value_param_float_3: f32,
   ) -> Self {
     match value_type {
-      0 => ParamSource::ParamBuffer(value_param_int.min(crate::fm::synth::MAX_PARAM_BUFFERS - 1)),
+      0 => ParamSource::ParamBuffer(value_param_int.min(MAX_PARAM_BUFFERS - 1)),
       1 => ParamSource::Constant {
         last_val: Cell::new(value_param_float),
         cur_val: value_param_float,

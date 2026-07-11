@@ -10,7 +10,7 @@ use dsp::{
   midi_number_to_frequency, oscillator::PhasedOscillator, uninit, FRAME_SIZE, SAMPLE_RATE,
 };
 
-use crate::{WaveTable, WaveTableSettings};
+use crate::{fm::param_source::MAX_PARAM_BUFFERS, WaveTable, WaveTableSettings};
 
 use super::{
   effects::EffectChain,
@@ -1272,7 +1272,6 @@ impl FMSynthVoice {
 }
 
 pub const OPERATOR_COUNT: usize = 8;
-pub const MAX_PARAM_BUFFERS: usize = 8;
 pub const FILTER_PARAM_BUFFER_COUNT: usize = 4;
 
 /// Holds the weights that controls how much each operator modulates each of the other operators,
