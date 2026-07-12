@@ -298,6 +298,9 @@ export class SamplerInstance {
 
   public shutdown() {
     this.isShutdown = true;
+    if (this.midiGateStatusBufferI32) {
+      Atomics.notify(this.midiGateStatusBufferI32, 512);
+    }
     if (this.awpHandle) {
       this.awpHandle.port.postMessage({ type: 'shutdown' });
       this.awpHandle.disconnect();

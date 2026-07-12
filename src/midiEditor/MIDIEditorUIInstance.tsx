@@ -31,6 +31,15 @@ if (PIXI.settings.RENDER_OPTIONS) {
 
 const dpr = window.devicePixelRatio ?? 1;
 
+const isTextInputFocused = (): boolean => {
+  const el = document.activeElement as HTMLElement | null;
+  if (!el) {
+    return false;
+  }
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+};
+
 export default class MIDIEditorUIInstance {
   public width: number;
   public height: number;
@@ -240,9 +249,7 @@ export default class MIDIEditorUIInstance {
         console.error(`Invalid midiNumber=${midiNumber} in serialized state; skipping`);
         continue;
       }
-      for (const { length, startPoint, velocity } of notes) {
-        this.notes.addNote(lineIx, startPoint, length, velocity ?? 90);
-      }
+      this.notes.loadLine(lineIx, notes);
     }
 
     // Destroy + re-create piano notes
@@ -686,17 +693,25 @@ export default class MIDIEditorUIInstance {
   private initEventHandlers() {
     this.eventHandlerCBs = {
       keyDown: (evt: KeyboardEvent) => {
+        // Modifier tracking stays global: the flags are only ever read by this instance's own
+        // pointer handlers, and clicking a note makes that instance active only *after* selection,
+        // so gating them here would break multi-select when clicking into a non-active instance.
         switch (evt.code) {
           case 'ControlLeft':
-          case 'ControlRight': {
+          case 'ControlRight':
             this.multiSelectEnabled = true;
-            break;
-          }
+            return;
           case 'ShiftLeft':
-          case 'ShiftRight': {
+          case 'ShiftRight':
             this.selectionBoxButtonDown = true;
-            break;
-          }
+            return;
+        }
+
+        if (this.parentInstance.uiManager.activeUIInstance !== this || isTextInputFocused()) {
+          return;
+        }
+
+        switch (evt.code) {
           case 'Delete': {
             for (const id of this.selectedNoteIDs) {
               this.deleteNote(id);

@@ -1,7 +1,7 @@
 import type { CompositionDefinition } from 'src/compositionSharing/CompositionSharing';
 import { BACKEND_BASE_URL } from 'src/conf';
 import type { BuildWavetableInstanceState } from 'src/fmSynth/Wavetable/BuildWavetableInstance';
-import type { SerializedMIDIEditorInstance } from 'src/midiEditor';
+import type { RemoteMIDIEditorState } from 'src/midiEditor';
 import { getLoginToken } from 'src/persistance';
 import type { Effect } from 'src/redux/modules/effects';
 import type { SynthVoicePreset } from 'src/redux/modules/presets';
@@ -238,7 +238,7 @@ export interface SavedMIDICompositionDescriptor {
  * in its own serialized state, so it needs both the metadata and the composition notes.
  */
 export interface SavedMIDIComposition extends SavedMIDICompositionDescriptor {
-  composition: SerializedMIDIEditorInstance;
+  composition: RemoteMIDIEditorState;
 }
 
 const parseSavedMIDIComposition = (
@@ -255,9 +255,7 @@ export const getSavedMIDICompositions = async (): Promise<SavedMIDICompositionDe
     ((await res.json()) as SavedMIDICompositionDescriptor[]).map(parseSavedMIDIComposition)
   );
 
-export const getMIDIComposition = async (
-  id: number
-): Promise<SerializedMIDIEditorInstance | null> =>
+export const getMIDIComposition = async (id: number): Promise<RemoteMIDIEditorState | null> =>
   fetch(`${BACKEND_BASE_URL}/midi_composition/${id}`).then(async res => {
     if (res.status === 404) {
       return null;
@@ -271,17 +269,20 @@ export const getMIDIComposition = async (
 export const saveMIDIComposition = async (
   name: string,
   description: string,
-  composition: SerializedMIDIEditorInstance,
+  composition: RemoteMIDIEditorState,
   tags: string[]
 ) => {
   const maybeLoginToken = await getLoginToken();
-  return fetch(`${BACKEND_BASE_URL}/midi_compositions`, {
+  const res = await fetch(`${BACKEND_BASE_URL}/midi_compositions`, {
     body: JSON.stringify({ name, description, composition, tags }),
     method: 'POST',
     headers: {
       Authorization: maybeLoginToken,
     },
   });
+  if (!res.ok) {
+    throw await res.text();
+  }
 };
 
 interface MIDICompositionTag {

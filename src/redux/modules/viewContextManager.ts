@@ -413,7 +413,7 @@ const actionGroups = {
             return;
           }
 
-          disconnectNodes(oldConnectedPair[0].node, oldConnectedPair[1].node, to);
+          disconnectNodes(oldConnectedPair[0].node, oldConnectedPair[1].node, to, false);
 
           const newConnectedPair = getConnectedPair(newConnectables, from, to);
           if (!newConnectedPair) {

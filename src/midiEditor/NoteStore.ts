@@ -94,6 +94,43 @@ export default class NoteStore {
   }
 
   /**
+   * Like {@link checkCanAddNote}, but notes whose id is in `excludeIds` are treated as absent.
+   * Used for multi-note vertical drags where the selected notes are about to vacate their lines.
+   */
+  public checkCanAddNoteExcluding(
+    lineIx: number,
+    startPoint: number,
+    length: number,
+    excludeIds: Set<number>
+  ): boolean {
+    if (lineIx < 0 || lineIx >= this.lines.length) {
+      return false;
+    }
+    const arr = this.lines[lineIx];
+    const endPoint = startPoint + length;
+    const idx = this.lowerBound(lineIx, startPoint);
+    for (let i = idx - 1; i >= 0; i--) {
+      if (excludeIds.has(arr[i].id)) {
+        continue;
+      }
+      if (arr[i].startPoint + arr[i].length > startPoint) {
+        return false;
+      }
+      break;
+    }
+    for (let i = idx; i < arr.length; i++) {
+      if (excludeIds.has(arr[i].id)) {
+        continue;
+      }
+      if (arr[i].startPoint < endPoint) {
+        return false;
+      }
+      break;
+    }
+    return true;
+  }
+
+  /**
    * Returns the empty interval surrounding `beat` on the given line into which a new note can be
    * placed without overlapping neighbors.
    */
@@ -130,6 +167,29 @@ export default class NoteStore {
     this.lines[lineIx].splice(idx, 0, note);
     this.byId.set(noteId, { lineIx, note });
     return noteId;
+  }
+
+  /**
+   * Bulk-loads a line from serialized state, shortening any note that overlaps its successor so the
+   * store's no-overlap invariant holds even when the source data is corrupted or legacy. Notes that
+   * collapse to non-positive length are dropped.
+   */
+  public loadLine(
+    lineIx: number,
+    notes: readonly { startPoint: number; length: number; velocity?: number }[]
+  ): void {
+    const sorted = [...notes].sort((a, b) => a.startPoint - b.startPoint);
+    for (let i = 0; i < sorted.length; i++) {
+      const n = sorted[i];
+      const next = sorted[i + 1];
+      const length =
+        next && n.startPoint + n.length > next.startPoint
+          ? next.startPoint - n.startPoint
+          : n.length;
+      if (length > 0) {
+        this.addNote(lineIx, n.startPoint, length, n.velocity ?? 90);
+      }
+    }
   }
 
   public deleteNote(id: number): void {

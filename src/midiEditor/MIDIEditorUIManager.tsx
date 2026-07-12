@@ -65,9 +65,7 @@ export class ManagedMIDIEditorUIInstance {
         console.error(`Invalid midiNumber=${midiNumber} in serialized state; skipping`);
         continue;
       }
-      for (const { length, startPoint, velocity } of notes) {
-        this.notes.addNote(lineIx, startPoint, length, velocity ?? 90);
-      }
+      this.notes.loadLine(lineIx, notes);
     }
 
     registerVcHideCb(this.manager.vcId, this.onVcHiddenStatusChanged);

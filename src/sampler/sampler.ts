@@ -3,6 +3,7 @@ import { mkContainerHider, mkContainerUnhider } from 'src/reactUtils';
 import type { SampleDescriptor } from 'src/sampleLibrary';
 import { mkSvelteContainerCleanupHelper, mkSvelteContainerRenderHelper } from 'src/svelteUtils.svelte';
 import { Map as ImmMap } from 'immutable';
+import { get } from 'svelte/store';
 import { SamplerInstance } from 'src/sampler/SamplerInstance';
 import DummyNode from 'src/graphEditor/nodes/DummyNode';
 import type { WaveformBounds } from 'src/granulator/GranulatorUI/WaveformRenderer';
@@ -45,7 +46,6 @@ const buildDefaultSamplerState = (): SerializedSampler => ({
 });
 
 const SamplerInstancesById = new Map<string, SamplerInstance>();
-const ActiveSamplerSamplesByVcId: Map<string, SampleDescriptor[]> = new Map();
 
 const getSamplerDOMElementId = (vcId: string) => `sampler-${vcId}`;
 
@@ -146,5 +146,8 @@ export const hide_sampler = mkContainerHider(getSamplerDOMElementId);
 
 export const unhide_sampler = mkContainerUnhider(getSamplerDOMElementId);
 
-export const sampler_list_used_samples = (vcId: string): SampleDescriptor[] =>
-  ActiveSamplerSamplesByVcId.get(vcId) ?? [];
+export const sampler_list_used_samples = (vcId: string): SampleDescriptor[] => {
+  const inst = SamplerInstancesById.get(vcId);
+  const descriptor = inst ? get(inst.activeSample)?.descriptor : null;
+  return descriptor ? [descriptor] : [];
+};

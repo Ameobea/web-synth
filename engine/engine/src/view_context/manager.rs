@@ -859,7 +859,18 @@ impl ViewContextManager {
           }
           base_portal_state = Some(state.clone());
         } else {
-          state.rx_subgraph_id = new_uuid_by_old_uuid[&state.rx_subgraph_id];
+          let old_rx = state.rx_subgraph_id;
+          state.rx_subgraph_id = new_uuid_by_old_uuid
+            .get(&old_rx)
+            .copied()
+            .unwrap_or_else(|| {
+              error!(
+                "Subgraph portal FC {} rx_subgraph_id {old_rx} not found in serialized subgraph \
+                 set; leaving unmapped",
+                fc.id
+              );
+              old_rx
+            });
         }
 
         fc.serialized_state = Some(serde_json::to_value(state).unwrap());
@@ -898,65 +909,73 @@ impl ViewContextManager {
         // Graph editors have to hold IDs of the nodes in their state, and since we're mapping the
         // state around, this causes the positions of nodes to get messed up.
         if vc.def.name == "graph_editor" {
-          let mut state: serde_json::Map<String, serde_json::Value> =
-            serde_json::from_str(val).unwrap();
-
-          // Keys to update: `last_node_id`, `nodes`, `selectedNodeVcId`
-          if let Some(serde_json::Value::String(last_node_id)) = state.get_mut("last_node_id") {
-            if let Some(mapped_last_node_id) =
-              map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, last_node_id)
-            {
-              *last_node_id = mapped_last_node_id
-            } else {
-              error!(
-                "`last_node_id` {last_node_id} from graph editor id {} in serialized subgraph is \
-                 not in the subgraph",
-                vc.def.uuid
-              );
-              *last_node_id = String::new();
-            };
-          }
-          if let Some(serde_json::Value::String(selected_node_vc_id)) =
-            state.get_mut("selectedNodeVcId")
+          // Leave the state untouched rather than panicking if it fails to parse
+          if let Ok(mut state) =
+            serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(val)
           {
-            if let Some(mapped_selected_node_id) = map_id(
-              &new_uuid_by_old_uuid,
-              &new_sid_by_old_sid,
-              selected_node_vc_id,
-            ) {
-              *selected_node_vc_id = mapped_selected_node_id
-            } else {
-              error!(
-                "`selected_node_vc_id` {selected_node_vc_id} from graph editor id {} in \
-                 serialized subgraph is not in the subgraph",
-                vc.def.uuid
-              );
-              *selected_node_vc_id = String::new();
-            };
-          }
-          if let Some(serde_json::Value::Array(nodes)) = state.get_mut("nodes") {
-            nodes.retain_mut(|node| {
-              if let Some(serde_json::Value::String(vc_id)) = node.get_mut("id") {
-                if let Some(mapped_vc_id) =
-                  map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, vc_id)
-                {
-                  *vc_id = mapped_vc_id;
-                  true
+            // Keys to update: `last_node_id`, `nodes`, `selectedNodeVcId`
+            if let Some(serde_json::Value::String(last_node_id)) = state.get_mut("last_node_id") {
+              if let Some(mapped_last_node_id) =
+                map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, last_node_id)
+              {
+                *last_node_id = mapped_last_node_id
+              } else {
+                error!(
+                  "`last_node_id` {last_node_id} from graph editor id {} in serialized subgraph \
+                   is not in the subgraph",
+                  vc.def.uuid
+                );
+                *last_node_id = String::new();
+              };
+            }
+            if let Some(serde_json::Value::String(selected_node_vc_id)) =
+              state.get_mut("selectedNodeVcId")
+            {
+              if let Some(mapped_selected_node_id) = map_id(
+                &new_uuid_by_old_uuid,
+                &new_sid_by_old_sid,
+                selected_node_vc_id,
+              ) {
+                *selected_node_vc_id = mapped_selected_node_id
+              } else {
+                error!(
+                  "`selected_node_vc_id` {selected_node_vc_id} from graph editor id {} in \
+                   serialized subgraph is not in the subgraph",
+                  vc.def.uuid
+                );
+                *selected_node_vc_id = String::new();
+              };
+            }
+            if let Some(serde_json::Value::Array(nodes)) = state.get_mut("nodes") {
+              nodes.retain_mut(|node| {
+                if let Some(serde_json::Value::String(vc_id)) = node.get_mut("id") {
+                  if let Some(mapped_vc_id) =
+                    map_id(&new_uuid_by_old_uuid, &new_sid_by_old_sid, vc_id)
+                  {
+                    *vc_id = mapped_vc_id;
+                    true
+                  } else {
+                    error!(
+                      "`node.id` {vc_id} from graph editor id {} in serialized subgraph is not in \
+                       the subgraph",
+                      vc.def.uuid
+                    );
+                    false
+                  }
                 } else {
-                  error!(
-                    "`node.id` {vc_id} from graph editor id {} in serialized subgraph is not in \
-                     the subgraph",
-                    vc.def.uuid
-                  );
                   false
                 }
-              } else {
-                false
-              }
-            })
-          }
+              })
+            }
 
-          *val = serde_json::to_string(&state).unwrap();
+            *val = serde_json::to_string(&state).unwrap();
+          } else {
+            error!(
+              "Error parsing graph editor state for vcId={} during subgraph load; leaving \
+               unchanged",
+              vc.def.uuid
+            );
+          }
         }
       }
 
@@ -970,7 +989,12 @@ impl ViewContextManager {
     }
 
     for (id, mut desc) in serialized.subgraphs {
-      let new_id = new_uuid_by_old_uuid[&desc.active_vc_id];
+      // `active_vc_id` may be `Uuid::nil()` (emptied-subgraph sentinel) or dangling; map those to
+      // nil rather than panicking on a missing key.  `get_active_vc` tolerates nil.
+      let new_id = new_uuid_by_old_uuid
+        .get(&desc.active_vc_id)
+        .copied()
+        .unwrap_or(Uuid::nil());
       desc.active_vc_id = new_id;
       self.subgraphs_by_id.insert(id, desc.clone());
     }

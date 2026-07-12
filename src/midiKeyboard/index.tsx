@@ -105,11 +105,16 @@ export const init_midi_keyboard = (stateKey: string) => {
   );
   document.getElementById('content')!.appendChild(elem);
 
+  const serialized = localStorage.getItem(stateKey);
   const initialState = tryParseJson<SerializedMidiKeyboardState, undefined>(
-    localStorage.getItem(stateKey)!,
+    serialized!,
     undefined,
     `Failed to parse localStorage state for MIDI keyboard with stateKey ${stateKey}; reverting to initial state.`
   );
+  if (serialized !== null && initialState === undefined) {
+    // clear the corrupt-but-present key so the default state doesn't get persisted over it on unload
+    localStorage.removeItem(stateKey);
+  }
 
   if (initialState) {
     for (const [controlIndex, controlValue] of Object.entries(

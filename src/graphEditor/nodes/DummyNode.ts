@@ -32,6 +32,7 @@ export default class DummyNode extends GainNode implements Pick<MIDINode, keyof 
   public onAttack = () => {};
   public onRelease = () => {};
   public clearAll = () => {};
+  public clearHeld = () => {};
 
   public onConnectionsChanged = () => {};
   public registerOnConnectionsChangedCb = () => {};

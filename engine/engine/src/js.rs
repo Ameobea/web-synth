@@ -211,6 +211,7 @@ extern "C" {
   pub fn persist_sampler(state_key: &str);
   pub fn cleanup_sampler(state_key: &str);
   pub fn get_sampler_audio_connectables(state_key: &str) -> JsValue;
+  pub fn sampler_list_used_samples(vc_id: &str) -> Vec<JsValue>;
 }
 
 #[wasm_bindgen(raw_module = "./equalizer/equalizer")]

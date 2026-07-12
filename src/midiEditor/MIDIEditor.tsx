@@ -13,7 +13,11 @@ import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPic
 import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImportDialog';
 import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal';
 import { getCurBeat, startAll } from 'src/eventScheduler';
-import type { MIDIEditorInstance, SerializedMIDIEditorState } from 'src/midiEditor';
+import type {
+  MIDIEditorInstance,
+  RemoteMIDIEditorState,
+  SerializedMIDIEditorState,
+} from 'src/midiEditor';
 import { CVOutputTopControls } from 'src/midiEditor/CVOutput/CVOutputTopControls';
 import { mkLoadMIDICompositionModal } from 'src/midiEditor/LoadMIDICompositionModal';
 import { MIDIEditorControlButton } from 'src/midiEditor/MIDIEditorControlButton';
@@ -477,15 +481,42 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
             return;
           }
 
+          let saveParams: Awaited<ReturnType<typeof renderGenericPresetSaverWithModal>>;
           try {
-            const { name, description, tags } = await renderGenericPresetSaverWithModal({
+            saveParams = await renderGenericPresetSaverWithModal({
               description: true,
               getExistingTags: getExistingMIDICompositionTags,
             });
-            const composition = activeInstance.current!.serialize(true);
-            await saveMIDIComposition(name, description ?? '', composition, tags ?? []);
           } catch (_err) {
+            // modal cancelled
             return;
+          }
+
+          const uiInst = activeInstance.current;
+          const composition: RemoteMIDIEditorState = {
+            lines: uiInst.serializeLines(),
+            view: {
+              pxPerBeat: parentInst.baseView.pxPerBeat,
+              scrollHorizontalBeats: parentInst.baseView.scrollHorizontalBeats,
+              scrollVerticalPx: uiInst.view.scrollVerticalPx,
+              beatsPerMeasure: parentInst.baseView.beatsPerMeasure,
+            },
+            beatSnapInterval: parentInst.beatSnapInterval,
+            cursorPosBeats: parentInst.getCursorPosBeats(),
+            localBPM: parentInst.localBPM,
+            loopPoint: parentInst.playbackHandler.getLoopPoint(),
+          };
+
+          try {
+            await saveMIDIComposition(
+              saveParams.name,
+              saveParams.description ?? '',
+              composition,
+              saveParams.tags ?? []
+            );
+            toastSuccess('MIDI composition saved');
+          } catch (err) {
+            toastError(`Failed to save MIDI composition: ${err}`);
           }
         }}
         label='💾'
@@ -507,7 +538,12 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
               return;
             }
 
-            activeInstance.current.reInitialize(composition);
+            activeInstance.current.reInitialize({
+              name: activeInstance.current.managedInst.name,
+              isExpanded: true,
+              lines: composition.lines,
+              view: { scrollVerticalPx: composition.view.scrollVerticalPx },
+            });
           } catch (_err) {
             return;
           }

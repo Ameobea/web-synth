@@ -36,7 +36,7 @@ export const mkBuildPasthroughInputCBs = (node: MIDINode) => (): MIDIInputCbs =>
   onAttack: (note, velocity) => node.onAttack(note, velocity),
   onRelease: (note, velocity) => node.onRelease(note, velocity),
   onPitchBend: bendAmount => node.outputCbs.forEach(cb => cb.onPitchBend(bendAmount)),
-  onClearAll: () => node.outputCbs.forEach(cbs => cbs.onClearAll()),
+  onClearAll: () => node.clearAll(),
   onGenericControl: (controlIndex, controlValue) =>
     node.outputCbs.forEach(cbs => cbs.onGenericControl?.(controlIndex, controlValue)),
 });
@@ -213,6 +213,21 @@ export class MIDINode {
         cbs.onClearAll();
       }
     });
+  }
+
+  /**
+   * Releases anything currently held by this node's own consumer (respecting its scheduling mode).
+   * Invoked when an incoming MIDI connection is severed so held notes / gates don't stick high.
+   */
+  public clearHeld() {
+    const cbs = this.inputCbs;
+    if (cbs.enableRxAudioThreadScheduling) {
+      for (const mailboxID of cbs.enableRxAudioThreadScheduling.mailboxIDs) {
+        postMIDIEventToAudioThread(mailboxID, MIDIEventType.ClearAll, 0, 0);
+      }
+    } else {
+      cbs.onClearAll();
+    }
   }
 
   private scheduledEvents: {

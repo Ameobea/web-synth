@@ -88,6 +88,12 @@ pub fn handle_window_close() {
   vcm.save_all();
 }
 
+/// Serializes the whole VCM (VC definitions, connections, foreign connectables, subgraphs) to
+/// `localStorage`.  Does *not* persist per-VC content state — callers that need that must persist
+/// each VC first (e.g. via `persist_vc_state`).
+#[wasm_bindgen]
+pub fn save_all() { get_vcm().save_all(); }
+
 #[wasm_bindgen]
 pub fn delete_vc_by_id(id: &str) {
   debug!("delete_vc_by_id(\"{}\")", id);

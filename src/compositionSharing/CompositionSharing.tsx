@@ -26,7 +26,7 @@ import { renderModalWithControls, type ModalCompProps } from 'src/controls/Modal
 import BasicModal from 'src/misc/BasicModal';
 import FlatButton from 'src/misc/FlatButton';
 import { getState } from 'src/redux';
-import { getSample, type SampleDescriptor } from 'src/sampleLibrary';
+import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
 import { NIL_UUID, formatDateTime, getEngine } from 'src/util';
 import { saveSubgraphPreset } from 'src/graphEditor/GraphEditor';
@@ -96,19 +96,14 @@ const uploadLocalSamples = async (localSamples: SampleDescriptor[]) => {
   );
 };
 
-const checkForLocalSamples = async () => {
+const checkForLocalSamples = async (): Promise<Map<string, SampleDescriptor> | null> => {
   const activeSamples: SampleDescriptor[] = getEngine()!.get_active_samples();
-  const activeLocalSamples = activeSamples.reduce(
-    (acc, descriptor) => {
-      if (!descriptor.isLocal) {
-        return acc;
-      }
-
-      acc.set(descriptor.name, descriptor);
-      return acc;
-    },
-    new Map() as Map<string, SampleDescriptor>
-  );
+  const activeLocalSamples = activeSamples.reduce((acc, descriptor) => {
+    if (descriptor.isLocal) {
+      acc.set(hashSampleDescriptor(descriptor), descriptor);
+    }
+    return acc;
+  }, new Map<string, SampleDescriptor>());
 
   if (activeLocalSamples.size === 0) {
     return null;
@@ -119,41 +114,39 @@ const checkForLocalSamples = async () => {
 
   const remoteSamples = await uploadLocalSamples(activeLocalSamplesList);
 
-  return [
-    activeSamples,
-    remoteSamples.map(sample => ({
+  const remoteByLocalHash = new Map<string, SampleDescriptor>();
+  activeLocalSamplesList.forEach((local, ix) => {
+    const remote = remoteSamples[ix];
+    remoteByLocalHash.set(hashSampleDescriptor(local), {
       isLocal: false,
-      name: sample.name,
-      url: sample.sampleUrl,
-      id: sample.id,
-    })),
-  ] as const;
+      name: remote.name,
+      url: remote.sampleUrl,
+      id: remote.id,
+    });
+  });
+
+  return remoteByLocalHash;
 };
 
-const updateSamplesInSave = (
-  save: any,
-  samples: readonly [SampleDescriptor[], SampleDescriptor[]]
-): any => {
+const updateSamplesInSave = (save: any, remoteByLocalHash: Map<string, SampleDescriptor>): any => {
   if (Array.isArray(save)) {
-    return save.map(save => updateSamplesInSave(save, samples));
+    return save.map(save => updateSamplesInSave(save, remoteByLocalHash));
   } else if (!save || typeof save !== 'object') {
     return save;
   }
 
   // Check to see if this object is a local sample and if so, replace it with its remote equivalent
   if (save.isLocal === true) {
-    const matchingIx = samples[0].findIndex(sample => R.equals(sample, save));
-    if (matchingIx !== -1) {
-      console.log('Found match for sample: ', save);
-      console.log('Replacing with: ', samples[1][matchingIx]);
-      return samples[1][matchingIx];
+    const remote = remoteByLocalHash.get(hashSampleDescriptor(save));
+    if (remote) {
+      return remote;
     } else {
       console.warn("Found `isLocal` but didn't match any samples: ", save);
     }
   }
 
   return Object.fromEntries(
-    Object.entries(save).map(([key, val]) => [key, updateSamplesInSave(val, samples)])
+    Object.entries(save).map(([key, val]) => [key, updateSamplesInSave(val, remoteByLocalHash)])
   );
 };
 

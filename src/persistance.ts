@@ -57,8 +57,15 @@ export const reinitializeWithComposition = (
   // Stop any playback
   stopAll();
 
-  // Tear down current application state
-  allViewContextIds.forEach(engine.delete_vc_by_id);
+  // Tear down current application state, continuing past any VC whose teardown throws so a single
+  // failure can't leave the app half-torn-down mid composition switch
+  allViewContextIds.forEach(id => {
+    try {
+      engine.delete_vc_by_id(id);
+    } catch (err) {
+      console.error(`Error deleting vcId=${id} during composition switch:`, err);
+    }
+  });
   getState().viewContextManager.patchNetwork.connectables.forEach(connectable => {
     dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(connectable.vcId));
   });
@@ -113,8 +120,18 @@ export const onBeforeUnload = (engine: typeof import('src/engine')) => {
     getState().viewContextManager.patchNetwork.connectables.filter(({ node }) => !!node)
   );
 
-  // Cleanup all VCs and save their state
-  engine.handle_window_close();
+  // Persist each VC's state, continuing past any that throw.  A JS exception thrown through a Wasm
+  // import unwinds straight out of the engine, so persisting inside a Rust loop (as
+  // `handle_window_close` does) lets one bad serializer abandon all later VCs and the final
+  // `save_all`; driving the loop here keeps the failure isolated.
+  for (const vc of getState().viewContextManager.activeViewContexts) {
+    try {
+      engine.persist_vc_state(vc.uuid);
+    } catch (err) {
+      console.error(`Error persisting state for vcId=${vc.uuid} on unload:`, err);
+    }
+  }
+  engine.save_all();
 };
 
 /**

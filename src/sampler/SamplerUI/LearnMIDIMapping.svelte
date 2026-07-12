@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { SamplerInstance } from 'src/sampler/SamplerInstance';
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { get } from 'svelte/store';
+  import { delay } from 'src/util';
 
   interface Props {
     selectionIx: number;
@@ -23,9 +24,25 @@
     (sel, ix) => ix !== selectionIx && sel.midiNumber === capturedMIDINumber
   ));
 
+  let cancelled = false;
+  onDestroy(() => {
+    cancelled = true;
+  });
+
   onMount(async () => {
-    while (true) {
-      capturedMIDINumber = await inst.captureNextMIDIAttack();
+    while (!cancelled) {
+      let midiNumber: number;
+      try {
+        midiNumber = await inst.captureNextMIDIAttack();
+      } catch {
+        // AWP not yet initialized; wait for it and retry
+        await delay(50);
+        continue;
+      }
+      if (cancelled) {
+        return;
+      }
+      capturedMIDINumber = midiNumber;
       if (
         !get(selections).some(
           (sel, ix) => ix !== selectionIx && sel.midiNumber === capturedMIDINumber

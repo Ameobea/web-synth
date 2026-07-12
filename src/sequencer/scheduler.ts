@@ -43,8 +43,8 @@ export const SequencerBeatPlayerByVoiceType: {
   sample: (
     state: SequencerReduxState,
     voiceIx: number,
-    _voice: Extract<VoiceTarget, { type: 'sample' }>,
-    _mark?: Extract<SequencerMark, { type: 'sample' }>
+    voice: Extract<VoiceTarget, { type: 'sample' }>,
+    mark?: Extract<SequencerMark, { type: 'sample' }>
   ) => {
     if (typeof state.sampleBank === 'string') {
       return;
@@ -54,11 +54,16 @@ export const SequencerBeatPlayerByVoiceType: {
       return;
     }
 
-    const node = new AudioBufferSourceNode(ctx, { buffer: sample.buffer });
-    node.start();
     const { outputGainNode } = state;
-    node.connect(outputGainNode);
-    node.onended = () => node.disconnect(outputGainNode);
+    const node = new AudioBufferSourceNode(ctx, { buffer: sample.buffer });
+    const gainNode = new GainNode(ctx, { gain: mark?.params?.gain ?? voice.gain ?? 1 });
+    node.connect(gainNode);
+    gainNode.connect(outputGainNode);
+    node.start();
+    node.onended = () => {
+      node.disconnect(gainNode);
+      gainNode.disconnect(outputGainNode);
+    };
   },
   gate: (
     state: SequencerReduxState,

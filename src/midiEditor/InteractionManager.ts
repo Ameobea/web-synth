@@ -229,8 +229,13 @@ class NoteDragSession implements DragSession {
     const app = this.app;
     const xDiffBeats = app.pxToBeats(pos.xPx - this.startXPx);
 
-    // move all notes horizontally before attempting any vertical movement
-    for (const [noteId, originalPosBeats] of this.originalPosBeatsByNoteId.entries()) {
+    // Move all notes horizontally before attempting any vertical movement, rightmost-first when
+    // dragging right (leftmost-first when dragging left) so selected notes vacate space for their
+    // selected neighbors instead of clamping against a group member that hasn't moved yet.
+    const ordered = [...this.originalPosBeatsByNoteId.entries()].sort(
+      (a, b) => (a[1] - b[1]) * (xDiffBeats < 0 ? 1 : -1)
+    );
+    for (const [noteId, originalPosBeats] of ordered) {
       const newDesiredStartPosBeats = Math.max(
         app.parentInstance.snapBeat(originalPosBeats + xDiffBeats),
         0
@@ -263,7 +268,16 @@ class NoteDragSession implements DragSession {
       if (newLineIndex < 0 || newLineIndex >= app.notes.lineCount) {
         return;
       }
-      if (!app.notes.checkCanAddNote(newLineIndex, note.startPoint, note.length)) {
+      // exclude the selected notes themselves: they all shift by `lineDiff`, so they can never
+      // collide with each other, but they'd otherwise register as occupying their soon-vacated lines
+      if (
+        !app.notes.checkCanAddNoteExcluding(
+          newLineIndex,
+          note.startPoint,
+          note.length,
+          app.selectedNoteIDs
+        )
+      ) {
         return;
       }
     }

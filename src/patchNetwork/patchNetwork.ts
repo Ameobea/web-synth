@@ -136,17 +136,19 @@ export const initPatchNetwork = (
       return true;
     }
 
-    const fromConnectablesReal: AudioConnectables = (fromConnectables ||
-      newConnectablesMap.get(from.vcId))!;
-    const toConnectablesReal: AudioConnectables = (toConnectables ||
-      newConnectablesMap.get(to.vcId))!;
+    const fromConnectablesReal = fromConnectables || newConnectablesMap.get(from.vcId);
+    const toConnectablesReal = toConnectables || newConnectablesMap.get(to.vcId);
 
     if (!fromConnectablesReal || !toConnectablesReal) {
       return false;
     }
 
-    const src = fromConnectablesReal.outputs.get(from.name)!;
-    const dst = toConnectablesReal.inputs.get(to.name)!;
+    const src = fromConnectablesReal.outputs.get(from.name);
+    const dst = toConnectablesReal.inputs.get(to.name);
+    if (!src || !dst) {
+      console.error('Skipping teardown of old connection with a missing endpoint port', { from, to });
+      return true;
+    }
 
     disconnectNodes(src.node, dst.node, to);
 
@@ -157,7 +159,11 @@ export const initPatchNetwork = (
   const addedConnections = connections.filter(([from, to]) => {
     const connectedPair = getConnectedPair(newConnectablesMap, from, to);
     if (!connectedPair) {
-      return false;
+      // Endpoint unresolvable — an async node whose ports aren't ready yet, or a renamed/removed
+      // port. Retain the descriptor rather than pruning it: the pruned list is committed to the
+      // engine immediately, so dropping here would turn any transient miss into permanent data
+      // loss. Retained connections physically reconnect on the next load once the port resolves.
+      return true;
     }
 
     // Do nothing if this is already connected by the existing set of connections

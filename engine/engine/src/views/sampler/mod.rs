@@ -32,6 +32,10 @@ impl ViewContext for Sampler {
   fn get_audio_connectables(&self) -> JsValue {
     js::get_sampler_audio_connectables(&self.get_state_key())
   }
+
+  fn list_used_samples(&self) -> Vec<JsValue> {
+    js::sampler_list_used_samples(&self.uuid.to_string())
+  }
 }
 
 pub fn mk_sampler(uuid: Uuid) -> Box<dyn ViewContext> { Box::new(Sampler { uuid }) }

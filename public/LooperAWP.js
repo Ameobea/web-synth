@@ -82,6 +82,10 @@ class LooperAWP extends AudioWorkletProcessor {
         this.needsUIThreadSchedulingByModuleIX.push(true);
         break;
       }
+      case 'deleteBank': {
+        this.wasmInstance.exports.looper_delete_bank(data.moduleIx, data.bankIx);
+        break;
+      }
       case 'setTransitionAlgorithm': {
         this.wasmInstance.exports.looper_init_transition_algorithm_buffer(data.data.length);
         const transitionAlgorithmBufferPtr =

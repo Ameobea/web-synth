@@ -22,12 +22,17 @@ const SignalAnalyzerInstsByStateKey = new Map<string, SignalAnalyzerHandle>();
 const ctx = new AudioContext();
 
 export const init_signal_analyzer = (stateKey: string) => {
-  const initialState =
-    tryParseJson<SerializedSignalAnalyzerInst, undefined>(
-      localStorage.getItem(stateKey)!,
-      undefined,
-      `Failed to parse localStorage state for signal analyzer with stateKey ${stateKey}; reverting to initial state.`
-    ) ?? buildDefaultSignalAnalyzerInstState();
+  const serialized = localStorage.getItem(stateKey);
+  const parsed = tryParseJson<SerializedSignalAnalyzerInst, undefined>(
+    serialized!,
+    undefined,
+    `Failed to parse localStorage state for signal analyzer with stateKey ${stateKey}; reverting to initial state.`
+  );
+  if (serialized !== null && parsed === undefined) {
+    // clear the corrupt-but-present key so the default state doesn't get persisted over it on unload
+    localStorage.removeItem(stateKey);
+  }
+  const initialState = parsed ?? buildDefaultSignalAnalyzerInstState();
   initialState.oscilloscopeUIState.frozen = false;
 
   if ((window as any).isHeadless) {

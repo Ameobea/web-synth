@@ -30,14 +30,16 @@ impl Eq for MIDIEvent {}
 
 impl Ord for MIDIEvent {
   fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    FloatOrd(self.beat).cmp(&FloatOrd(other.beat))
+    // same-beat ungate (`is_gate == false`) must sort before gate so a retrigger of the same
+    // pitch releases the old note before the new one attacks
+    FloatOrd(self.beat)
+      .cmp(&FloatOrd(other.beat))
+      .then_with(|| self.is_gate.cmp(&other.is_gate))
   }
 }
 
 impl PartialOrd for MIDIEvent {
-  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-    Some(FloatOrd(self.beat).cmp(&FloatOrd(other.beat)))
-  }
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
 }
 
 struct LooperBank {
@@ -247,6 +249,12 @@ pub extern "C" fn looper_activate_bank(module_ix: usize, bank_ix: isize, cur_bea
   };
 
   let ctx = ctx(module_ix);
+  for (note, is_playing) in ctx.playing_notes.iter_mut().enumerate() {
+    if *is_playing {
+      unsafe { release_note(module_ix, note as u8) };
+      *is_playing = false;
+    }
+  }
   ctx.active_bank_ix = bank_ix;
   ctx.transition_algorithm.handle_manual_transition(bank_ix);
 
@@ -466,6 +474,32 @@ pub extern "C" fn looper_delete_module(module_ix: usize) {
   ctxs().remove(module_ix);
 }
 
+/// Remove-and-shift a bank so the wasm-side `banks` Vec stays index-aligned with the redux banks
+/// array, which splices on delete.
+#[no_mangle]
+pub extern "C" fn looper_delete_bank(module_ix: usize, bank_ix: usize) {
+  let ctx = ctx(module_ix);
+  if ctx.banks.len() <= bank_ix {
+    return;
+  }
+  ctx.banks.remove(bank_ix);
+
+  match ctx.active_bank_ix {
+    Some(active) if active == bank_ix => {
+      for (note, is_playing) in ctx.playing_notes.iter_mut().enumerate() {
+        if *is_playing {
+          unsafe { release_note(module_ix, note as u8) };
+          *is_playing = false;
+        }
+      }
+      ctx.active_bank_ix = None;
+      ctx.next_evt_ix = None;
+    },
+    Some(active) if active > bank_ix => ctx.active_bank_ix = Some(active - 1),
+    _ => {},
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn looper_set_loop_len_beats(module_ix: usize, bank_ix: usize, len_beats: f32) {
   let ctx = ctx(module_ix);
@@ -505,4 +539,22 @@ pub extern "C" fn looper_set_transition_algorithm(module_ix: usize, algorithm_ty
   let ctx = ctx(module_ix);
   ctx.transition_algorithm =
     TransitionAlgorithm::from_parts(algorithm_type, transition_algorithm_buffer());
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn same_beat_ungate_sorts_before_gate() {
+    let mut evts = vec![
+      MIDIEvent { is_gate: true, note: 60, beat: 2.0 },
+      MIDIEvent { is_gate: false, note: 60, beat: 2.0 },
+      MIDIEvent { is_gate: true, note: 61, beat: 1.0 },
+    ];
+    evts.sort_unstable();
+    assert_eq!(FloatOrd(evts[0].beat), FloatOrd(1.0));
+    assert!(!evts[1].is_gate, "ungate must sort before gate at equal beat");
+    assert!(evts[2].is_gate);
+  }
 }

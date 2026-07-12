@@ -95,6 +95,8 @@ export const init_control_panel = (stateKey: string) => {
         });
       } catch (err) {
         console.warn('Failed to parse serialized control panel state; defaulting.');
+        // clear the bad key so the default state doesn't get persisted over it on unload
+        localStorage.removeItem(stateKey);
         return Option.none();
       }
     })

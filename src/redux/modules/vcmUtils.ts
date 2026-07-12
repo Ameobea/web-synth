@@ -14,7 +14,7 @@ import type {
   ConnectableOutput,
   PatchNetwork,
 } from 'src/patchNetwork';
-import type { MIDINode } from 'src/patchNetwork/midiNode';
+import { MIDINode } from 'src/patchNetwork/midiNode';
 import { reinitializeWithComposition, setCurLoadedCompositionId } from 'src/persistance';
 import { getState, store } from 'src/redux';
 import { filterNils, getEngine, UnreachableError } from 'src/util';
@@ -30,28 +30,44 @@ export const commitForeignConnectables = (
 ) =>
   engine.set_foreign_connectables(
     JSON.stringify(
-      [...foreignConnectables.values()].map(({ vcId, node }) => {
-        if (!node) {
-          throw new Error("Foreign connectables didn't have a `node`");
-        } else if (Number.isNaN(+vcId)) {
-          throw new Error(`Foreign connectable with non-numeric \`vcId\` found: "${vcId}"`);
-        }
+      filterNils(
+        [...foreignConnectables.values()].map(({ vcId, node }) => {
+          if (!node) {
+            console.error(`Foreign connectable vcId=${vcId} didn't have a \`node\`; skipping`);
+            return null;
+          } else if (Number.isNaN(+vcId)) {
+            console.error(`Foreign connectable with non-numeric \`vcId\` found: "${vcId}"; skipping`);
+            return null;
+          }
 
-        const subgraphId =
-          getState().viewContextManager.activeViewContexts.find(vc => vc.uuid === vcId)
-            ?.subgraphId ??
-          getState().viewContextManager.foreignConnectables.find(fc => fc.id === vcId)?.subgraphId;
-        if (!subgraphId) {
-          throw new Error(`vcId=${vcId} was not found in any view context or foreign connectable`);
-        }
+          const vcmState = getState().viewContextManager;
+          const existingFC = vcmState.foreignConnectables.find(fc => fc.id === vcId);
+          const subgraphId =
+            vcmState.activeViewContexts.find(vc => vc.uuid === vcId)?.subgraphId ??
+            existingFC?.subgraphId;
+          if (!subgraphId) {
+            console.error(
+              `vcId=${vcId} was not found in any view context or foreign connectable; skipping`
+            );
+            return null;
+          }
 
-        return {
-          id: vcId.toString(),
-          type: node.nodeType,
-          serializedState: node.serialize ? node.serialize() : null,
-          subgraphId,
-        };
-      })
+          // `set_foreign_connectables` replaces the whole list, so a throwing serializer must not
+          // drop the FC — fall back to its last-known committed state instead.
+          let serializedState: any;
+          try {
+            serializedState = node.serialize ? node.serialize() : null;
+          } catch (err) {
+            console.error(
+              `Error serializing foreign connectable vcId=${vcId}; preserving last-known state:`,
+              err
+            );
+            serializedState = existingFC?.serializedState ?? null;
+          }
+
+          return { id: vcId.toString(), type: node.nodeType, serializedState, subgraphId };
+        })
+      )
     )
   );
 
@@ -90,7 +106,8 @@ export const connectNodes = (
 export const disconnectNodes = (
   src: AudioNode | MIDINode,
   dst: AudioNode | MIDINode | AudioParam,
-  dstDescriptor: ConnectableDescriptor
+  dstDescriptor: ConnectableDescriptor,
+  sendMidiClearAll = true
 ) => {
   // We handle the special case of an `OverridableAudioParam` or `OverridableAudioNode` here, notifying it of its potentially new status
   if (dst instanceof OverridableAudioParam || dst instanceof OverridableAudioNode) {
@@ -117,6 +134,12 @@ export const disconnectNodes = (
         dstDescriptor,
       });
     }
+  }
+
+  // Severing a MIDI cable must release notes held on the destination, else its gate sticks high.
+  // Suppressed for in-place identity-swap rewires, which must not interrupt a legitimately-held note.
+  if (sendMidiClearAll && dst instanceof MIDINode) {
+    dst.clearHeld();
   }
 };
 

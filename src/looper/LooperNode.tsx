@@ -203,6 +203,10 @@ export class LooperNode {
     this.postMessage({ type: 'deleteModule', moduleIx });
   }
 
+  public deleteBank(moduleIx: number, bankIx: number) {
+    this.postMessage({ type: 'deleteBank', moduleIx, bankIx });
+  }
+
   private encodeTransitionAlgorithm(transitionAlgorithm: LooperTransitionAlgorithm): {
     transitionAlgorithmType: number;
     data: Float32Array;

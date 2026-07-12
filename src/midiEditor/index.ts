@@ -87,6 +87,25 @@ export interface SerializedMIDIEditorState {
   tempoTrackOpen?: boolean;
 }
 
+/**
+ * Wire format for MIDI compositions saved to / loaded from the backend.  Mirrors the Rust
+ * `SerializedMIDIEditorState` struct (`backend/src/models/midi_composition.rs`) field-for-field;
+ * the backend deserializes the save payload into it and returns the same shape on load.
+ */
+export interface RemoteMIDIEditorState {
+  lines: SerializedMIDILine[];
+  view: {
+    pxPerBeat: number;
+    scrollHorizontalBeats: number;
+    scrollVerticalPx: number;
+    beatsPerMeasure: number;
+  };
+  beatSnapInterval: number;
+  cursorPosBeats: number;
+  localBPM: number;
+  loopPoint: number | null;
+}
+
 export const serializeNoteStore = (notes: NoteStore): SerializedMIDILine[] => {
   const lineCount = notes.lineCount;
   const out: SerializedMIDILine[] = new Array(lineCount);
@@ -357,6 +376,8 @@ export const init_midi_editor = (vcId: string) => {
         return Option.of(JSON.parse(k));
       } catch (_err) {
         console.warn('Failed to parse stored MIDI editor state; returning default');
+        // clear the bad key so the default state doesn't get persisted over it on unload
+        localStorage.removeItem(stateKey);
         return Option.none();
       }
     })

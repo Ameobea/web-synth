@@ -31,13 +31,15 @@
       return setting;
     };
 
-    const settings: ControlPanelSetting[] = [
-      {
+    const settings: ControlPanelSetting[] = [];
+
+    if (inputCount < MAX_MIXER_TRACK_COUNT) {
+      settings.push({
         type: 'button',
         label: 'add input',
         action: addInput,
-      },
-    ];
+      });
+    }
 
     if (inputCount > 2) {
       settings.push({

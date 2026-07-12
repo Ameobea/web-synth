@@ -173,13 +173,21 @@ const looperSlice = createSlice({
       const instState = state.stateByVcId[vcId];
       const moduleState = instState.modules[moduleIx];
       const bankIx = moduleState.banks.findIndex(bank => bank.id === bankId);
-      const isActive = moduleState.activeBankIx === bankIx;
-      moduleState.banks = moduleState.banks.filter(bank => bank.id !== bankId);
-      if (isActive) {
-        moduleState.activeBankIx = null;
-        instState.looperNode.setActiveBankIx(moduleIx, null);
-        instState.looperNode.setCompositionForBank(moduleIx, bankIx, null, 8);
+      if (bankIx === -1) {
+        return;
       }
+      const wasActive = moduleState.activeBankIx === bankIx;
+      moduleState.banks.splice(bankIx, 1);
+
+      // Keep `activeBankIx` pointing at the same bank after the splice; the backend Vec is
+      // remove-and-shifted to stay index-aligned with `banks`.
+      if (wasActive) {
+        moduleState.activeBankIx = null;
+      } else if (moduleState.activeBankIx !== null && moduleState.activeBankIx > bankIx) {
+        moduleState.activeBankIx -= 1;
+      }
+
+      instState.looperNode.deleteBank(moduleIx, bankIx);
     },
     setLoadedComposition: (
       state,
