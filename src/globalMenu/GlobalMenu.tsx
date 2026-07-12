@@ -261,7 +261,7 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ closeMenu, engine, isOpen }) =>
                 R.prop('uuid')
               );
               const res = reinitializeWithComposition(
-                { type: 'serialized', value: fileContent },
+                { type: 'serialized', value: fileContent, id: null },
                 engine,
                 allViewContextIds
               );

@@ -194,8 +194,11 @@ export const Filter: React.FC<FilterProps> = ({
     (key: string, val: any) => {
       if (key === 'bypass') {
         dispatch(actionCreators.synthDesigner.SET_FILTER_IS_BYPASSED(synthIx, val));
-      } else if (key === 'enable envelope') {
+        return;
+      }
+      if (key === 'enable envelope') {
         dispatch(actionCreators.synthDesigner.SET_FILTER_ENVELOPE_ENABLED(synthIx, val));
+        return;
       }
 
       dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key as any, val));

@@ -98,6 +98,11 @@ export const updateGraph = (
 
   // Now, we just have to handle all of these computed diffs to synchronize the LiteGraph graph with the patch network
 
+  const computeTitle = (id: string): string => {
+    const foreignAudioNode = patchNetwork.connectables.get(id)?.node;
+    return foreignAudioNode ? (foreignAudioNode as any).name : getVcTitle(activeViewContexts, id);
+  };
+
   const createAndAddNode = (id: string, params?: { [key: string]: any }) => {
     // Time complexity sucks here
     const connectables = patchNetwork.connectables.get(id)!;
@@ -105,7 +110,7 @@ export const updateGraph = (
     const newNode = createAudioConnectablesNode(
       connectables,
       id,
-      foreignAudioNode ? (foreignAudioNode as any).name : getVcTitle(activeViewContexts, id),
+      computeTitle(id),
       foreignAudioNode ? foreignAudioNode.nodeType : null
     );
 
@@ -150,6 +155,21 @@ export const updateGraph = (
     (node as any).setConnectables?.(patchNetwork.connectables.get(key)!);
   });
 
+  // Refresh titles of existing nodes so renames (VC or foreign label changes) show without recreation
+  const refreshTitle = (id: string) => {
+    const lgNode = graph._nodes_by_id[id];
+    if (!lgNode) {
+      return;
+    }
+    const title = computeTitle(id);
+    if (title && lgNode.title !== title) {
+      lgNode.title = title;
+      graph.setDirtyCanvas(true, true);
+    }
+  };
+  unchangedNodes.forEach(refreshTitle);
+  modifiedNodes.forEach(refreshTitle);
+
   // At this point, all nodes should be created/removed and have up-to-date `AudioConnectables`.  We must now run through the list
   // of connections and connect nodes in litegraph to reflect them
   //
@@ -178,47 +198,40 @@ export const updateGraph = (
   };
 
   // Prune existing connections that shouldn't be connected
-  Object.values(graph.links).forEach(({ origin_id, origin_slot, target_id, target_slot }) => {
-    const linkExists = Option.of(connectionsByNode.get(origin_id.toString()))
-      .flatMap(conns =>
-        Option.of(
-          !!conns.find(conn => {
-            const srcNode = getNode(conn[0].vcId)!;
-            return (
-              conn[0].name === srcNode.outputs[origin_slot].name &&
-              conn[1].vcId === target_id.toString() &&
-              conn[1].name === getNode(conn[1].vcId)!.inputs[target_slot].name
-            );
-          })
+  Object.values(graph.links)
+    .filter(R.identity)
+    .forEach(({ id, origin_id, origin_slot, target_id, target_slot }) => {
+      const linkExists = Option.of(connectionsByNode.get(origin_id.toString()))
+        .flatMap(conns =>
+          Option.of(
+            !!conns.find(conn => {
+              const srcNode = getNode(conn[0].vcId)!;
+              return (
+                conn[0].name === srcNode.outputs[origin_slot].name &&
+                conn[1].vcId === target_id.toString() &&
+                conn[1].name === getNode(conn[1].vcId)!.inputs[target_slot].name
+              );
+            })
+          )
         )
-      )
-      .getOrElse(false);
+        .getOrElse(false);
 
-    if (linkExists) {
-      return;
-    }
-    // If both the source and destination nodes were moved out of this subgraph, ignore the connection
-    if (
-      !allVcIDsInSubgraph.has(origin_id.toString()) &&
-      !allVcIDsInSubgraph.has(target_id.toString())
-    ) {
-      return;
-    }
+      if (linkExists) {
+        return;
+      }
+      // If both the source and destination nodes were moved out of this subgraph, ignore the connection
+      if (
+        !allVcIDsInSubgraph.has(origin_id.toString()) &&
+        !allVcIDsInSubgraph.has(target_id.toString())
+      ) {
+        return;
+      }
 
-    // Disconnect the link
-    const srcNode = getNode(origin_id.toString())!;
-    const dstNode = getNode(target_id.toString())!;
-
-    const disconnectionSuccessful = srcNode.disconnectOutput(origin_slot, dstNode);
-    if (!disconnectionSuccessful) {
-      console.error('Failed to prune connection between nodes:', {
-        origin_id,
-        origin_slot,
-        target_id,
-        target_slot,
-      });
-    }
-  });
+      // Prune by exact link id so the correct link is severed when a source output feeds multiple
+      // inputs of the same target node.  `removeLink` disconnects the target input slot, firing
+      // `onConnectionsChange(false)` once for this link on both endpoints.
+      graph.removeLink(id);
+    });
 
   subgraphLocalConnections.forEach(connection => {
     // Check to see if we have an actual existing connection between the two nodes/ports and create one if we don't

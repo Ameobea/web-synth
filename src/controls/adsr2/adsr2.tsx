@@ -583,6 +583,7 @@ class RampCurve {
   public destroy() {
     if (this.curve) {
       this.inst.vizContainer.removeChild(this.curve);
+      this.curve.destroy();
     }
     this.curve = null;
     this.handle?.destroy();

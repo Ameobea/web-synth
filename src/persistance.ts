@@ -1,4 +1,3 @@
-import * as R from 'ramda';
 import download from 'downloadjs';
 import { Either } from 'funfix-core';
 
@@ -13,6 +12,32 @@ import { AsyncOnce, getEngine } from 'src/util';
 export const serializeAndDownloadComposition = () => {
   download(JSON.stringify(localStorage), 'composition.json', 'application/json');
 };
+
+// Every per-VC `localStorage` key starts with one of these (mirrors the engine `get_state_key`
+// impls plus the `vc_` definition key every VC has).  Used to sweep orphans that don't belong to
+// any live VC.
+export const VC_LOCALSTORAGE_KEY_PREFIXES = [
+  'vc_',
+  'graphEditor_',
+  'welcomePage_',
+  'controlPanel_',
+  'faustEditor_',
+  'sampler_',
+  'filterDesigner_',
+  'granulator_',
+  'looper_',
+  'compositionSharing_',
+  'MIDIKeyboard_',
+  'SampleLibrary_',
+  'equalizer_',
+  'SignalAnalyzer_',
+  'sequencer_',
+  'synthDesigner_',
+  'midiEditor_',
+];
+
+export const isVCLocalStorageKey = (key: string): boolean =>
+  VC_LOCALSTORAGE_KEY_PREFIXES.some(prefix => key.startsWith(prefix));
 
 /**
  * Resets the current state of the application, tearing down + cleaning up all modules and VCs and re-initializes
@@ -70,6 +95,15 @@ export const reinitializeWithComposition = (
     dispatch(actionCreators.viewContextManager.REMOVE_PATCH_NETWORK_NODE(connectable.vcId));
   });
 
+  // Sweep any per-VC keys orphaned by prior compositions so they can't survive the switch and get
+  // baked into future saves.  Must run after live-VC teardown (which reads those keys) and before
+  // rehydration (which writes the incoming composition's keys).
+  Object.keys(localStorage).forEach(key => {
+    if (isVCLocalStorageKey(key)) {
+      localStorage.removeItem(key);
+    }
+  });
+
   // Rehydrate `localStorage` with parsed composition
   Object.entries(deserialized).forEach(([key, val]) => localStorage.setItem(key, val));
 
@@ -77,7 +111,9 @@ export const reinitializeWithComposition = (
   // it to the clock owner and the readable BPM output.
   loadTempoFromComposition(deserialized);
 
-  if (!R.isNil(compositionBody.id)) {
+  // `undefined` id leaves the loaded-composition lineage untouched; an explicit `null` clears it
+  // (demo-tile / file-import loads), a number sets it.
+  if (compositionBody.id !== undefined) {
     setCurLoadedCompositionId(compositionBody.id);
   }
 

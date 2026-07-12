@@ -151,7 +151,6 @@ const buildDefaultFilterEnvelope = (audioThreadData: AudioThreadData): Adsr => {
 
 interface InitAndConnectFilterCSNsArgs {
   filterCSNs: FilterCSNs;
-  synthIx: number;
   stateKey: string;
   fmSynth: FMSynth;
 }
@@ -164,7 +163,6 @@ interface FilterOverrideStatusChangeCBs {
 
 const initAndConnectFilterCSNs = ({
   filterCSNs,
-  synthIx,
   stateKey,
   fmSynth,
 }: InitAndConnectFilterCSNsArgs): FilterOverrideStatusChangeCBs => {
@@ -184,7 +182,10 @@ const initAndConnectFilterCSNs = ({
   );
 
   const handleFrequencyOverrideStatusChange = (isOverridden: boolean) => {
-    const targetSynth = getState().synthDesigner.synths[synthIx];
+    const targetSynth = getState().synthDesigner.synths.find(s => s.fmSynth === fmSynth);
+    if (!targetSynth) {
+      return;
+    }
     const controlSource = isOverridden
       ? targetSynth.filterEnvelopeEnabled
         ? FilterParamControlSource.Envelope
@@ -196,7 +197,10 @@ const initAndConnectFilterCSNs = ({
   handleFrequencyOverrideStatusChange(filterCSNs.frequency.getIsOverridden());
 
   const handleQOverrideStatusChange = (isOverridden: boolean) => {
-    const targetSynth = getState().synthDesigner.synths[synthIx];
+    const targetSynth = getState().synthDesigner.synths.find(s => s.fmSynth === fmSynth);
+    if (!targetSynth) {
+      return;
+    }
     const controlSource = isOverridden
       ? FilterParamControlSource.Manual
       : FilterParamControlSource.PatchNetwork;
@@ -206,7 +210,10 @@ const initAndConnectFilterCSNs = ({
   handleQOverrideStatusChange(filterCSNs.Q.getIsOverridden());
 
   const handleGainOverrideStatusChange = (isOverridden: boolean) => {
-    const targetSynth = getState().synthDesigner.synths[synthIx];
+    const targetSynth = getState().synthDesigner.synths.find(s => s.fmSynth === fmSynth);
+    if (!targetSynth) {
+      return;
+    }
     const controlSource = isOverridden
       ? FilterParamControlSource.Manual
       : FilterParamControlSource.PatchNetwork;
@@ -246,13 +253,17 @@ const buildDefaultSynthModule = (
           throw new Error(`Failed to get state for stateKey=${stateKey}`);
         }
         const { getState, dispatch, actionCreators } = state;
-        const pitchMultiplier = getState().synthDesigner.synths[synthIx].pitchMultiplier;
-        fmSynth.setFrequencyMultiplier(pitchMultiplier);
+        const synths = getState().synthDesigner.synths;
+        const currentIx = synths.findIndex(s => s.fmSynth === fmSynth);
+        if (currentIx === -1) {
+          return;
+        }
+        fmSynth.setFrequencyMultiplier(synths[currentIx].pitchMultiplier);
 
-        const cbs = initAndConnectFilterCSNs({ filterCSNs, synthIx, stateKey, fmSynth });
-        dispatch(actionCreators.synthDesigner.SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS(synthIx, cbs));
+        const cbs = initAndConnectFilterCSNs({ filterCSNs, stateKey, fmSynth });
+        dispatch(actionCreators.synthDesigner.SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS(currentIx, cbs));
 
-        connectFMSynth(stateKey, synthIx);
+        connectFMSynth(stateKey, currentIx);
 
         maybeUpdateMIDINode(getState().synthDesigner);
       },
@@ -330,12 +341,16 @@ export const deserializeSynthModule = (
         throw new Error(`Failed to get state for stateKey=${stateKey}`);
       }
       const { getState, dispatch, actionCreators } = state;
-      const targetSynth = getState().synthDesigner.synths[synthIx];
-      const filterCSNs = targetSynth.filterCSNs;
-      const cbs = initAndConnectFilterCSNs({ filterCSNs, synthIx, stateKey, fmSynth });
-      dispatch(actionCreators.synthDesigner.SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS(synthIx, cbs));
+      const synths = getState().synthDesigner.synths;
+      const currentIx = synths.findIndex(s => s.fmSynth === fmSynth);
+      if (currentIx === -1) {
+        return;
+      }
+      const filterCSNs = synths[currentIx].filterCSNs;
+      const cbs = initAndConnectFilterCSNs({ filterCSNs, stateKey, fmSynth });
+      dispatch(actionCreators.synthDesigner.SET_FILTER_OVERRIDE_STATUS_CHANGE_CBS(currentIx, cbs));
 
-      connectFMSynth(stateKey, synthIx);
+      connectFMSynth(stateKey, currentIx);
 
       maybeUpdateMIDINode(getState().synthDesigner);
     },
@@ -433,11 +448,8 @@ const maybeUpdateMIDINode = (state: SynthDesignerState) => {
           'Should never be called; should be handled by audio thread scheduling'
         );
       },
-      onPitchBend: () => {
-        throw new UnreachableError(
-          'Should never be called; should be handled by audio thread scheduling'
-        );
-      },
+      // pitch bend bypasses audio-thread scheduling and the FM synth engine has no pitch-bend impl
+      onPitchBend: () => {},
       onClearAll: () => {
         throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'

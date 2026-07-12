@@ -16,6 +16,7 @@ export interface LiteGraphNodeOutput extends LiteGraphNodePort {
 
 export interface LiteGraphNode {
   id: string;
+  title: string;
   graph: LiteGraph;
   inputs: LiteGraphNodeInput[];
   outputs: LiteGraphNodeOutput[];
@@ -36,6 +37,7 @@ export interface LiteGraphConnectablesNode extends LiteGraphNode {
 }
 
 export interface LiteGraphLink {
+  id: number;
   origin_id: string | number;
   origin_slot: number;
   target_id: string | number;
@@ -48,6 +50,7 @@ export interface LiteGraph {
   _nodes_by_id: { [id: string]: LiteGraphNode };
   add: (node: LiteGraphNode) => void;
   remove: (node: LiteGraphNode) => void;
+  removeLink: (linkId: number) => void;
   arrange: () => void;
   start: () => void;
   onNodeRemoved?: (node: any) => void | undefined;

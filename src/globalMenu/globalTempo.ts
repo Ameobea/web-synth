@@ -15,6 +15,8 @@ import { rwritable, type TransparentWritable } from 'src/util';
 
 const ctx = new AudioContext();
 
+const DEFAULT_BPM = 120;
+
 /**
  * Readable BPM output for the `BPMNode` and tempo-synced consumers.  Reflects the base tempo while
  * stopped and follows the active tempo segment during playback (see the live-follow loop below);
@@ -36,7 +38,9 @@ const loadFromLocalStorage = (): TempoChange[] => {
       console.warn('Failed to parse `tempoChanges` from localStorage; using `globalTempo`', err);
     }
   }
-  return normalizeTempoChanges([{ beat: 0, bpm: +(localStorage?.getItem('globalTempo') ?? 120) }]);
+  return normalizeTempoChanges([
+    { beat: 0, bpm: +(localStorage?.getItem('globalTempo') ?? DEFAULT_BPM) },
+  ]);
 };
 
 /** Source of truth for composition tempo.  Subscribe for reactive UIs; `.current` for sync reads. */
@@ -127,9 +131,9 @@ export const loadTempoFromComposition = (body: { [key: string]: unknown }) => {
     changes = [{ beat: 0, bpm: +body.globalTempo }];
   }
 
-  if (changes) {
-    setTempoChanges(changes);
-  }
+  // Reset to default when the composition carries no tempo so a prior composition's tempo can't
+  // bleed across the switch and get saved into the new one.
+  setTempoChanges(changes ?? [{ beat: 0, bpm: DEFAULT_BPM }]);
 };
 
 export const getGlobalBpm = () => tempoChangesStore.current[0].bpm;

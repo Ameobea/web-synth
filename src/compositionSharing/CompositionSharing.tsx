@@ -7,6 +7,7 @@ import {
   getLoginToken,
   persistAllVCsAndFCs,
   reinitializeWithComposition,
+  VC_LOCALSTORAGE_KEY_PREFIXES,
 } from '../persistance';
 import './CompositionSharing.css';
 import {
@@ -209,28 +210,19 @@ const removeCompositionSharingFromVCMState = (composition: Record<string, any>) 
 };
 
 /**
- * There was a long-standing bug where state entries for MIDI editors weren't cleared out of `localStorage`
- * properly when the MIDI editor was deleted.  This prevents a ton of wasted space from getting used up
- * in saved compositions by cleaning them out.
+ * State entries for VCs (MIDI editors historically, but every VC type) can be left behind in
+ * `localStorage` when the VC is deleted.  Drop any per-VC key whose VC isn't currently active so
+ * orphans don't get saved into the composition and waste space / self-perpetuate.
  */
 const removeOrphanEntriesFromComposition = (composition: Record<string, any>) => {
   const activeViewContexts = getState().viewContextManager.activeViewContexts;
   for (const key of Object.keys(composition)) {
-    if (key.startsWith('vc_')) {
-      const vcId = key.split('vc_')[1];
-      if (!activeViewContexts.some(vc => vc.uuid === vcId)) {
-        delete composition[key];
-        localStorage.removeItem(key);
-      }
-
+    const prefix = VC_LOCALSTORAGE_KEY_PREFIXES.find(p => key.startsWith(p));
+    if (!prefix) {
       continue;
     }
 
-    if (!key.startsWith('midiEditor_')) {
-      continue;
-    }
-
-    const vcId = key.split('midiEditor_')[1];
+    const vcId = key.slice(prefix.length);
     if (!activeViewContexts.some(vc => vc.uuid === vcId)) {
       delete composition[key];
       localStorage.removeItem(key);

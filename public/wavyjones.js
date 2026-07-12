@@ -44,7 +44,7 @@ window.WavyJones = function (context, elem, width, height) {
   retryAsync(
     async () => {
       const elem_ = document.getElementById(elem);
-      if (!elem) {
+      if (!elem_) {
         throw new Error();
       }
       return elem_;

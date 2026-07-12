@@ -102,3 +102,55 @@ fn gain_envelope_click_debug() {
 
   println!("Cur frame output: {:?}", adsr.get_cur_frame_output());
 }
+
+fn mk_flat_adsr(log_scale: bool) -> Adsr {
+  let steps = vec![
+    AdsrStep {
+      x: 0.,
+      y: 0.,
+      ramper: RampFn::Linear,
+    },
+    AdsrStep {
+      x: 1.,
+      y: 1.,
+      ramper: RampFn::Linear,
+    },
+  ];
+  Adsr::new(
+    steps,
+    None,
+    1000.,
+    None,
+    1.,
+    Rc::new([0.; RENDERED_BUFFER_SIZE]),
+    EarlyReleaseConfig::default(),
+    log_scale,
+  )
+}
+
+#[test]
+fn frozen_output_applies_scale_then_shift() {
+  let mut adsr = mk_flat_adsr(false);
+  let (scale, shift, value) = (3.0f32, 2.0f32, 0.5f32);
+  adsr.set_frozen_output_value(value, scale, shift);
+  let expected = value * scale + shift;
+  for &s in adsr.get_cur_frame_output().iter() {
+    assert!(
+      (s - expected).abs() < 1e-5,
+      "frozen output {s} != value*scale+shift={expected}"
+    );
+  }
+}
+
+#[test]
+fn frozen_output_log_floor_matches_live_conversion() {
+  let mut adsr = mk_flat_adsr(true);
+  adsr.set_frozen_output_value(0., 1., 0.);
+  let expected = dsp::mk_linear_to_log(0.001, 1., 1.)(0.);
+  for &s in adsr.get_cur_frame_output().iter() {
+    assert!(
+      (s - expected).abs() < 1e-6,
+      "frozen log-min {s} != live floor {expected}"
+    );
+  }
+}

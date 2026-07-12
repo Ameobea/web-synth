@@ -39,11 +39,8 @@ const buildSynthDesignerMIDINode = (): MIDINode =>
           'Should never be called; should be handled by audio thread scheduling'
         );
       },
-      onPitchBend: () => {
-        throw new UnreachableError(
-          'Should never be called; should be handled by audio thread scheduling'
-        );
-      },
+      // pitch bend bypasses audio-thread scheduling and the FM synth engine has no pitch-bend impl
+      onPitchBend: () => {},
       onClearAll: () => {
         throw new UnreachableError(
           'Should never be called; should be handled by audio thread scheduling'

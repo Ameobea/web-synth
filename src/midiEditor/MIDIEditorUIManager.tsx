@@ -31,7 +31,7 @@ export class ManagedMIDIEditorUIInstance {
   public midiInputCBs: MIDIInputCbs;
   public notes: NoteStore;
   public lastSetNoteVelocity: number;
-  public renderedMinimap: SVGSVGElement | undefined;
+  public renderedMinimap: Writable<SVGSVGElement | undefined> = writable(undefined);
   /**
    * Incremented when the VC is unhidden to force React to mount a fresh canvas.  The old canvas
    * can't be re-used because destroying the PIXI app on hide force-loses its WebGL context.
@@ -273,8 +273,7 @@ export class MIDIEditorUIManager {
       return;
     }
 
-    inst.instance.renderedMinimap = svg;
-    this.instances.set(insts);
+    inst.instance.renderedMinimap.set(svg);
   }
 
   public collapseUIInstance(id: string) {
@@ -326,7 +325,7 @@ export class MIDIEditorUIManager {
 
     inst.isExpanded = true;
     if (inst.type === 'midiEditor') {
-      inst.instance.renderedMinimap = undefined;
+      inst.instance.renderedMinimap.set(undefined);
     }
 
     this.resizeInstances(instances);

@@ -47,7 +47,7 @@
       }
       const allViewContextIds = getState().viewContextManager.activeViewContexts.map(c => c.uuid);
       reinitializeWithComposition(
-        { type: 'serialized', value: composition.content },
+        { type: 'serialized', value: composition.content, id: +compositionID },
         getEngine()!,
         allViewContextIds
       );

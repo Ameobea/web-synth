@@ -1,6 +1,6 @@
 import { getSentry } from 'src/sentry';
 import type { TempoChange } from 'src/eventScheduler/transport';
-import { UnimplementedError, UnreachableError, retryAsync } from 'src/util';
+import { UnimplementedError, UnreachableError, genRandomStringID, retryAsync } from 'src/util';
 import { writable, type Writable } from 'svelte/store';
 
 export enum MIDIEventType {
@@ -313,7 +313,7 @@ export const scheduleEventTimeAbsolute = (time: number, cb: () => void): number 
  * Schedules `cb` to be run `time` seconds after the time the global beat counter was last started
  */
 export const scheduleEventTimeRelativeToStart = (time: number, cb: () => void): number =>
-  scheduleEventTimeAbsolute(time - lastStartTime, cb);
+  scheduleEventTimeAbsolute(lastStartTime + time, cb);
 
 /**
  * Schedules `cb` to be run `time` seconds from the current time
@@ -383,7 +383,12 @@ export const scheduleMIDIEventBeats = (
 export const scheduleEventBeatsRelative = (beatsFromNow: number, cb: () => void): number => {
   const cbId = registerCb(cb);
   if (!SchedulerHandle) {
-    PendingEvents.push({ type: 'schedule', time: null, beats: 0, payload: { type: 'cbId', cbId } });
+    PendingEvents.push({
+      type: 'schedule',
+      time: null,
+      beats: beatsFromNow,
+      payload: { type: 'cbId', cbId },
+    });
     return cbId;
   }
 

@@ -35,17 +35,17 @@ LGAudioConnectables.prototype.setConnectables = function (
   while (this.inputs && i < this.inputs.length) {
     if (!connectables.inputs.has(this.inputs[i].name)) {
       this.removeInput(i);
-      i = 0;
+    } else {
+      i += 1;
     }
-    i += 1;
   }
   i = 0;
   while (this.outputs && i < this.outputs.length) {
     if (!connectables.outputs.has(this.outputs[i].name)) {
       this.removeOutput(i);
-      i = 0;
+    } else {
+      i += 1;
     }
-    i += 1;
   }
 
   [...connectables.inputs.entries()].forEach(([name, input]) => {

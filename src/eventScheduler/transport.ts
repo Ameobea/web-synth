@@ -157,6 +157,9 @@ export interface MIDIClient {
 const cmpEvent = (a: ScheduledMIDIEvent, b: ScheduledMIDIEvent): number =>
   a.beat - b.beat || b.type - a.type || a.id - b.id;
 
+/** Delivered-prefix length that triggers a prune attempt; keeps the O(n) splice amortized cheap. */
+const PRUNE_THRESHOLD = 512;
+
 /**
  * Holds the active tempo map and a per-target timeline of scheduled future events.  Consumers
  * poll once per render quantum with their own globally-consistent `currentFrame`, so delivery
@@ -169,6 +172,8 @@ export class Transport {
   generation = 0;
   private scheduled: Map<string, ScheduledMIDIEvent[]> = new Map();
   private immediate: Map<string, DueEvent[]> = new Map();
+  /** Every client polling a target, so pruning can find the laggiest cursor for that target. */
+  private clients: Map<string, MIDIClient[]> = new Map();
 
   constructor(tempoMap: TempoMap, frameSize = 128) {
     this.tempoMap = tempoMap;
@@ -191,12 +196,15 @@ export class Transport {
     if (!this.scheduled.has(targetID)) {
       this.scheduled.set(targetID, []);
       this.immediate.set(targetID, []);
+      this.clients.set(targetID, []);
     }
   }
 
   createClient(targetID: string): MIDIClient {
     this.addTarget(targetID);
-    return { targetID, nextBeat: null, generation: this.generation };
+    const client: MIDIClient = { targetID, nextBeat: null, generation: this.generation };
+    this.clients.get(targetID)!.push(client);
+    return client;
   }
 
   /**
@@ -277,6 +285,7 @@ export class Transport {
 
     const windowEndBeat = this.tempoMap.beatAt(currentFrame + this.frameSize);
     const arr = this.scheduled.get(client.targetID);
+    let deliveredPrefix = 0;
     if (arr && arr.length) {
       const lowerBound = client.nextBeat ?? this.tempoMap.beatAt(currentFrame);
       let lo = 0;
@@ -289,6 +298,7 @@ export class Transport {
           hi = mid;
         }
       }
+      deliveredPrefix = lo;
       for (let i = lo; i < arr.length && arr[i].beat < windowEndBeat; i++) {
         const e = arr[i];
         let off = Math.round(this.tempoMap.frameAt(e.beat)) - currentFrame;
@@ -302,6 +312,51 @@ export class Transport {
     }
     client.nextBeat = windowEndBeat;
 
+    if (deliveredPrefix > PRUNE_THRESHOLD) {
+      this.pruneDelivered(client.targetID);
+    }
+
     return out;
+  }
+
+  /**
+   * Drops events every client on `targetID` has already passed (`beat` strictly below the
+   * laggiest live cursor).  A client whose cursor is stale for the current generation, or which
+   * hasn't polled yet, has no committed floor, so pruning is skipped until it does — this keeps
+   * a freshly (re)started or newly created client from losing events below a stale-high cursor.
+   */
+  private pruneDelivered(targetID: string): void {
+    const arr = this.scheduled.get(targetID)!;
+    if (arr.length === 0) {
+      return;
+    }
+    const clients = this.clients.get(targetID)!;
+    if (clients.length === 0) {
+      return;
+    }
+    let minCursor = Infinity;
+    for (let i = 0; i < clients.length; i++) {
+      const c = clients[i];
+      if (c.generation !== this.generation || c.nextBeat === null) {
+        return;
+      }
+      if (c.nextBeat < minCursor) {
+        minCursor = c.nextBeat;
+      }
+    }
+
+    let lo = 0;
+    let hi = arr.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (arr[mid].beat < minCursor) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    if (lo > 0) {
+      arr.splice(0, lo);
+    }
   }
 }

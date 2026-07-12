@@ -10,6 +10,7 @@
   interface Props {
     parentInstance: MIDIEditorInstance;
     inst: ManagedMIDIEditorUIInstance;
+    renderedMinimap: Readable<SVGSVGElement | undefined>;
     pxPerBeat: Readable<number>;
     scrollHorizontalBeats: Readable<number>;
     expand: () => void;
@@ -20,6 +21,7 @@
   let {
     parentInstance,
     inst,
+    renderedMinimap,
     pxPerBeat,
     scrollHorizontalBeats,
     expand,
@@ -53,9 +55,9 @@
   });
 
   $effect(() => {
-    if (minimapContainer && inst.renderedMinimap) {
-      minimapContainer.appendChild(inst.renderedMinimap);
-      svg = inst.renderedMinimap;
+    if (minimapContainer && $renderedMinimap) {
+      minimapContainer.appendChild($renderedMinimap);
+      svg = $renderedMinimap;
     } else {
       svg = null;
     }

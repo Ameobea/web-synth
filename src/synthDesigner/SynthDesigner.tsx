@@ -275,7 +275,8 @@ const SynthDesigner: React.FC<SynthDesignerProps> = ({ stateKey }) => {
 
     const ctx = new AudioContext();
     const newWavyJonesInstance =
-      buildWavyJonesInstance(ctx, 'oscilloscope', 490, 240) ?? (new AnalyserNode(ctx) as WavyJones);
+      buildWavyJonesInstance(ctx, 'synth-designer-oscilloscope', 490, 240) ??
+      (new AnalyserNode(ctx) as WavyJones);
     dispatch(actionCreators.synthDesigner.SET_WAVY_JONES_INSTANCE(newWavyJonesInstance));
   }, [actionCreators.synthDesigner, dispatch, synthCount, wavyJonesInstanceInitialized]);
 

@@ -614,12 +614,12 @@ impl Adsr {
   }
 
   fn fill_buffer_with_value(&mut self, value: f32, scale: f32, shift: f32) {
-    let mut frozen_output = value * if self.log_scale { 100. } else { scale + shift };
+    let mut frozen_output = if self.log_scale { value * 100. } else { value * scale + shift };
     if self.log_scale {
       let mut min = shift;
       let max = min + scale;
       if shift == 0. {
-        min = if max > 0. { 0.01 } else { -0.01 };
+        min = if max > 0. { 0.001 } else { -0.001 };
       }
 
       frozen_output = mk_linear_to_log(min, max, max.signum())(frozen_output);

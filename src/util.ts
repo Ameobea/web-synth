@@ -326,21 +326,24 @@ export const normalizeEnvelope = (envelope: Adsr | ADSRValues): Adsr => {
   return envelope as Adsr;
 };
 
+export const genRandomStringID = (): string => {
+  if ((crypto as any)?.randomUUID) {
+    return crypto.randomUUID();
+  }
+  const s4 = () =>
+    Math.floor((1 + Math.random()) * 0x10000)
+      .toString(16)
+      .substring(1);
+  return `${s4()}${s4()}-${s4()}${s4()}-${s4()}${s4()}-${s4()}${s4()}`;
+};
+
 export const initGlobals = () => {
   (window as any).dbg = <T>(arg: T) => {
     console.trace(arg);
     return arg;
   };
 
-  (window as any).genRandomStringID = (window.crypto as any)?.randomUUID
-    ? () => crypto.randomUUID()
-    : () => {
-        const s4 = () =>
-          Math.floor((1 + Math.random()) * 0x10000)
-            .toString(16)
-            .substring(1);
-        return `${s4()}${s4()}-${s4()}${s4()}-${s4()}${s4()}-${s4()}${s4()}`;
-      };
+  (window as any).genRandomStringID = genRandomStringID;
 };
 
 export const NIL_UUID = '00000000-0000-0000-0000-000000000000';

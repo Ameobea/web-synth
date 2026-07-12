@@ -644,6 +644,7 @@ const MIDIEditorInstanceComp: React.FC<MIDIEditorInstanceCompProps> = ({
         <CollapsedMIDIEditorShim
           parentInstance={parentInstance}
           inst={inst}
+          renderedMinimap={inst.renderedMinimap}
           pxPerBeat={parentInstance.baseView.pxPerBeatStore}
           scrollHorizontalBeats={parentInstance.baseView.scrollHorizontalBeatsStore}
           expand={() => parentInstance.uiManager.expandUIInstance(inst.id)}
