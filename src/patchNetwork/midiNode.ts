@@ -246,7 +246,7 @@ export class MIDINode {
         fn(evt.note, evt.velocity, true);
       };
 
-      cbIDs.push(scheduleEventBeats(beat, cb));
+      cbIDs.push(scheduleEventBeats(beat, cb, evt.type));
     }
 
     if (needsAudioThreadScheduling) {

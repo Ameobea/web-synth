@@ -278,10 +278,11 @@ const LooperTab: React.FC<LooperTabProps> = ({ vcId, name, ix, isActive }) => {
 const loadLooperPreset = (vcId: string, preset: SerializedLooperInstState) => {
   const oldState = getState().looper.stateByVcId[vcId];
 
-  // Tear down existing state, deleting all banks and all modules
-  oldState.modules.forEach((_mod, moduleIx) => {
+  // Tear down existing state, deleting all banks and all modules.  Descending order since each
+  // removal splices the modules array.
+  for (let moduleIx = oldState.modules.length - 1; moduleIx >= 0; moduleIx--) {
     looperDispatch(looperActions.removeModule({ vcId, moduleIx }));
-  });
+  }
 
   // Load the new state
   preset.modules.forEach((mod, moduleIx) => {

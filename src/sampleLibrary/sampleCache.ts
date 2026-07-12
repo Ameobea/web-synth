@@ -60,8 +60,8 @@ const maybePruneOldEntries = async (neededBytes: number) => {
   }
 
   let freedSpace = 0;
-  while (MAX_CACHE_SIZE_BYTES - usedSpace - freedSpace <= neededBytes) {
-    const oldestEntry = await samplesTable.orderBy('lastAccessed').reverse().first();
+  while (MAX_CACHE_SIZE_BYTES - usedSpace + freedSpace < neededBytes) {
+    const oldestEntry = await samplesTable.orderBy('lastAccessed').first();
     if (R.isNil(oldestEntry)) {
       throw new Error(
         "Somehow there are no entries in the samples cache but we're still over the cache limit"

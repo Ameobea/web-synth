@@ -49,11 +49,13 @@ const ActiveSamplerSamplesByVcId: Map<string, SampleDescriptor[]> = new Map();
 
 const getSamplerDOMElementId = (vcId: string) => `sampler-${vcId}`;
 
-const deserializeSampler = (serialized: string): SerializedSampler => {
+const deserializeSampler = (stateKey: string, serialized: string): SerializedSampler => {
   try {
     return JSON.parse(serialized);
   } catch (err) {
     console.warn('Error deserializing sampler state: ', err);
+    // clear the bad key so the default state doesn't get persisted over it on unload
+    localStorage.removeItem(stateKey);
     return buildDefaultSamplerState();
   }
 };
@@ -63,7 +65,7 @@ export const init_sampler = (stateKey: string) => {
 
   const serialized = localStorage.getItem(stateKey);
   const initialState: SerializedSampler = serialized
-    ? deserializeSampler(serialized)
+    ? deserializeSampler(stateKey, serialized)
     : buildDefaultSamplerState();
 
   const inst = new SamplerInstance(vcId, initialState);

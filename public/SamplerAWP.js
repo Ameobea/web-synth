@@ -130,8 +130,8 @@ class SamplerAWP extends AudioWorkletProcessor {
         break;
       }
       case 'clearSelection': {
-        const { index } = data;
-        this.wasmInstance.exports.sampler_clear_selection(this.ctxPtr, index);
+        const { midiNumber } = data;
+        this.wasmInstance.exports.sampler_clear_selection(this.ctxPtr, midiNumber);
         break;
       }
       case 'captureNextMIDIAttack': {

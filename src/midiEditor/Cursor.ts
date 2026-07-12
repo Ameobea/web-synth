@@ -163,12 +163,13 @@ export class LoopCursor extends Cursor {
     }
 
     const normalizedX = newPos.x - conf.PIANO_KEYBOARD_WIDTH;
-    const newPosBeats = Math.max(
-      this.app.parentInstance.snapBeat(
-        this.app.pxToBeats(normalizedX) + this.app.parentInstance.baseView.scrollHorizontalBeats
-      ),
-      0
+    const newPosBeats = this.app.parentInstance.snapBeat(
+      this.app.pxToBeats(normalizedX) + this.app.parentInstance.baseView.scrollHorizontalBeats
     );
+    // dragging to/past zero would either NaN-poison playback or delete the cursor mid-drag
+    if (newPosBeats <= 0) {
+      return;
+    }
     this.app.parentInstance.setLoopPoint(newPosBeats);
   }
 }

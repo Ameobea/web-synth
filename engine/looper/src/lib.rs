@@ -309,6 +309,7 @@ pub extern "C" fn looper_on_playback_start() {
       ctx.transition_algorithm = new_transition_algorithm;
       new_active_bank_ix
     };
+    let new_active_bank_ix = new_active_bank_ix.filter(|&ix| ctx.banks.get(ix).is_some());
     ctx.last_beat = std::f32::INFINITY;
     ctx.active_bank_ix = new_active_bank_ix;
     unsafe {
@@ -342,6 +343,30 @@ fn process_looper_module(cur_beat: f32, module_ix: usize, ctx: &mut LooperCtx) -
   let loop_beat = cur_beat % active_bank.len_beats;
 
   if loop_beat < ctx.last_beat {
+    let is_playback_start = ctx.last_beat == std::f32::INFINITY;
+
+    if !is_playback_start {
+      // fire remaining old-iteration events in `(last_beat, len_beats]` before wrapping
+      while let Some(next_evt_ix) = ctx.next_evt_ix {
+        let evt = match active_bank.events.get(next_evt_ix) {
+          Some(evt) if evt.beat <= active_bank.len_beats => evt,
+          _ => break,
+        };
+        if evt.is_gate {
+          ctx.playing_notes[evt.note as usize] = true;
+          unsafe { play_note(module_ix, evt.note) };
+        } else {
+          ctx.playing_notes[evt.note as usize] = false;
+          unsafe { release_note(module_ix, evt.note) };
+        }
+        ctx.next_evt_ix = if next_evt_ix + 1 < active_bank.events.len() {
+          Some(next_evt_ix + 1)
+        } else {
+          None
+        };
+      }
+    }
+
     ctx.last_beat = loop_beat;
     ctx.next_evt_ix = Some(0);
 
@@ -369,6 +394,23 @@ fn process_looper_module(cur_beat: f32, module_ix: usize, ctx: &mut LooperCtx) -
         ctx.active_bank_ix = None;
         unsafe { set_active_bank_ix(module_ix, -1) };
       },
+    }
+
+    if is_playback_start {
+      // skip events strictly before the start position rather than replaying them as a burst;
+      // an event exactly at the start beat still fires via the loop below
+      while let Some(next_evt_ix) = ctx.next_evt_ix {
+        match active_bank.events.get(next_evt_ix) {
+          Some(evt) if evt.beat < loop_beat => {
+            ctx.next_evt_ix = if next_evt_ix + 1 < active_bank.events.len() {
+              Some(next_evt_ix + 1)
+            } else {
+              None
+            };
+          },
+          _ => break,
+        }
+      }
     }
   }
 

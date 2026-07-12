@@ -144,6 +144,14 @@ export class SamplerInstance {
 
   public async setSelectedSample(descriptor: SampleDescriptor | null) {
     if (!descriptor) {
+      for (const selection of get(this.selections)) {
+        if (typeof selection.midiNumber === 'number') {
+          this.awpHandle?.port.postMessage({
+            type: 'clearSelection',
+            midiNumber: selection.midiNumber,
+          });
+        }
+      }
       this.activeSample.set(null);
       this.activeSelectionIx.set(null);
       this.selections.set([]);
@@ -161,7 +169,6 @@ export class SamplerInstance {
         !curActiveSample ||
         hashSampleDescriptor(curActiveSample.descriptor) !== hashSampleDescriptor(descriptor)
       ) {
-        this.activeSample.set(null);
         return;
       }
 
@@ -232,13 +239,17 @@ export class SamplerInstance {
       throw new Error(`Selection at index ${ix} does not exist`);
     }
 
+    const oldMIDINumber = selections[ix].midiNumber;
     const nameChanged = selections[ix].name !== newSelection.name;
-    const midiNumberChanged = selections[ix].midiNumber !== newSelection.midiNumber;
+    const midiNumberChanged = oldMIDINumber !== newSelection.midiNumber;
 
     const newSelections = [...selections];
     newSelections[ix] = newSelection;
     this.selections.set(newSelections);
 
+    if (midiNumberChanged && typeof oldMIDINumber === 'number') {
+      this.awpHandle?.port.postMessage({ type: 'clearSelection', midiNumber: oldMIDINumber });
+    }
     this.commitSelection(newSelection);
 
     if (nameChanged || midiNumberChanged) {

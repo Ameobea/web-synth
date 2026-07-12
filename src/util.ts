@@ -186,7 +186,7 @@ export class AsyncOnce<T> {
       return this.pending;
     }
 
-    this.pending = new Promise(resolve => {
+    this.pending = new Promise((resolve, reject) => {
       let promise: Promise<T>;
       if (this.retry) {
         const { attempts = undefined, delayMs = undefined } =
@@ -196,11 +196,18 @@ export class AsyncOnce<T> {
         promise = this.getter();
       }
 
-      promise.then(res => {
-        this.res = Option.some(res);
-        this.pending = null;
-        resolve(res);
-      });
+      promise.then(
+        res => {
+          this.res = Option.some(res);
+          this.pending = null;
+          resolve(res);
+        },
+        err => {
+          // clear `pending` so a later `get()` can retry
+          this.pending = null;
+          reject(err);
+        }
+      );
     });
     return this.pending!;
   }

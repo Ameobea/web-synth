@@ -123,7 +123,7 @@ const migrateControlPanelState = (cps: any): GranulatorControlPanelState => {
   };
 };
 
-const deserializeGranulator = (serialized: string): SerializedGranulator => {
+const deserializeGranulator = (stateKey: string, serialized: string): SerializedGranulator => {
   try {
     const deserialized = JSON.parse(serialized);
     if (!deserialized.controlPanelState) {
@@ -135,6 +135,8 @@ const deserializeGranulator = (serialized: string): SerializedGranulator => {
     };
   } catch (err) {
     console.warn('Error deserializing granulator state: ', err);
+    // clear the bad key so the default state doesn't get persisted over it on unload
+    localStorage.removeItem(stateKey);
     return buildDefaultGranulatorState();
   }
 };
@@ -198,7 +200,7 @@ export const init_granulator = async (stateKey: string) => {
 
   const serialized = localStorage.getItem(stateKey);
   const initialState: SerializedGranulator = Option.of(serialized)
-    .map(deserializeGranulator)
+    .map(s => deserializeGranulator(stateKey, s))
     .getOrElseL(buildDefaultGranulatorState);
 
   const granularWasmPromise = GranularWasm.get();

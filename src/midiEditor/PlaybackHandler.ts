@@ -59,7 +59,7 @@ class RecordingContext {
       // handle wrapping around when looping
       if (newLength < 0) {
         this.onRelease(midiNumber);
-        return;
+        continue;
       }
 
       if (newLength > 0) {
@@ -71,7 +71,7 @@ class RecordingContext {
     }
   }
 
-  public onAttack(midiNumber: number) {
+  public onAttack(midiNumber: number, velocity = 90) {
     if (this.downNoteIdsByMIDINumber.has(midiNumber)) {
       return;
     }
@@ -86,7 +86,7 @@ class RecordingContext {
       return;
     }
 
-    const noteID = inst.notes.addNote(lineIx, curBeat, 0.001, 90);
+    const noteID = inst.notes.addNote(lineIx, curBeat, 0.001, velocity);
     this.downNoteIdsByMIDINumber.set(midiNumber, noteID);
     inst.uiInst?.onNotesChanged();
   }
@@ -157,7 +157,8 @@ export default class MIDIEditorPlaybackHandler {
 
   constructor(inst: MIDIEditorInstance, initialState: SerializedMIDIEditorState) {
     this.inst = inst;
-    this.loopPoint = initialState.loopPoint;
+    this.loopPoint =
+      initialState.loopPoint !== null && initialState.loopPoint > 0 ? initialState.loopPoint : null;
     this.metronomeEnabled = initialState.metronomeEnabled;
     this.cbs = {
       start: (startBeat: number) => this.onGlobalStart(startBeat),
@@ -179,6 +180,11 @@ export default class MIDIEditorPlaybackHandler {
     if (this.isPlaying) {
       console.warn("Can't set loop point while MIDI editor is playing");
       return false;
+    }
+
+    // a loop point of zero would make cursor position `curBeat % 0` = NaN
+    if (newLoopPoint !== null && newLoopPoint <= 0) {
+      newLoopPoint = null;
     }
 
     this.loopPoint = newLoopPoint;
@@ -415,11 +421,11 @@ export default class MIDIEditorPlaybackHandler {
   }
 
   public stopPlayback() {
-    stopAll();
-
     if (!this.isPlaying) {
       return;
     }
+
+    stopAll();
 
     for (const inst of get(this.inst.uiManager.instances)) {
       if (inst.type === 'cvOutput') {
@@ -460,6 +466,8 @@ export default class MIDIEditorPlaybackHandler {
 
   public destroy() {
     this.stopPlayback();
+    // even if playback wasn't active, cancel our own scheduled events + release held notes
+    this.cancelAllScheduledNotes();
     unregisterStartCB(this.cbs.start);
     unregisterStopCB(this.cbs.stop);
   }

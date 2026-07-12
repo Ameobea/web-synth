@@ -248,7 +248,10 @@ class NoteDragSession implements DragSession {
     const ungatedLineIndices: Set<number> = new Set();
     const gatedLineIndicesToVelocity: Map<number, number> = new Map();
     for (const noteId of selectedNoteIds) {
-      const note = app.notes.getNote(noteId)!;
+      const note = app.notes.getNote(noteId);
+      if (!note) {
+        continue;
+      }
       const lineIx = app.notes.getLineIx(noteId)!;
 
       ungatedLineIndices.add(lineIx);

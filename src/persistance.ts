@@ -36,6 +36,24 @@ export const reinitializeWithComposition = (
     deserialized = compositionBody.value;
   }
 
+  // Sanity-check the VCM state before tearing anything down; the engine panics mid-`init()` on
+  // malformed `vcmState`, which would otherwise destroy the current composition unrecoverably
+  try {
+    const vcmState = JSON.parse(deserialized.vcmState);
+    const requiredFields = [
+      'view_context_ids',
+      'active_view_ix',
+      'patch_network_connections',
+      'foreign_connectables',
+    ];
+    const missingField = requiredFields.find(field => !(field in vcmState));
+    if (missingField) {
+      return Either.left(`Invalid composition; \`vcmState\` is missing field "${missingField}"`);
+    }
+  } catch (_err) {
+    return Either.left('Invalid composition; missing or unparseable `vcmState`');
+  }
+
   // Stop any playback
   stopAll();
 
@@ -128,11 +146,10 @@ export const loadSharedComposition = async (
       console.log('Loaded comp id matches existing; not refreshing from scratch');
       return;
     }
-
-    await db.currentLoadedCompositionId.clear();
-    await db.currentLoadedCompositionId.add(composition.id, ['']);
   }
 
+  // Parse before committing the loaded composition id so a parse failure can't leave the DB
+  // claiming this composition is loaded
   const deserialized = JSON.parse(composition.content);
   const keysToRetain = ['globalVolume'];
   const retainedValues = keysToRetain.map(key => [key, localStorage.getItem(key)]);
@@ -151,6 +168,12 @@ export const loadSharedComposition = async (
   // Apply tempo from the composition body (authoritative — see `loadTempoFromComposition`); pushes
   // it to the clock owner and the readable BPM output.
   loadTempoFromComposition(deserialized);
+
+  if (!(window as any).isHeadless) {
+    const db = await LocalCompDB.get();
+    await db.currentLoadedCompositionId.clear();
+    await db.currentLoadedCompositionId.add(composition.id, ['']);
+  }
 };
 
 export const getCurLoadedCompositionId = async (): Promise<number | null> => {
@@ -225,13 +248,16 @@ export const getLoginToken = async (): Promise<string> => {
     return fetchingLoginToken;
   }
 
-  fetchingLoginToken = new Promise(async resolve => {
-    const table = await LoginTokenTable.get();
-    const [token] = await table.toArray();
-    cachedLoginToken = token || '';
-    resolve(token || '');
-    fetchingLoginToken = null;
-  });
+  fetchingLoginToken = (async () => {
+    try {
+      const table = await LoginTokenTable.get();
+      const [token] = await table.toArray();
+      cachedLoginToken = token || '';
+      return token || '';
+    } finally {
+      fetchingLoginToken = null;
+    }
+  })();
 
   return fetchingLoginToken;
 };

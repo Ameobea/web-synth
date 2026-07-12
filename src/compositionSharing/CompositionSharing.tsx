@@ -473,12 +473,17 @@ const LoadComposition: React.FC = () => (
         const allViewContextIds = getState().viewContextManager.activeViewContexts.map(
           R.prop('uuid')
         );
-        await clearLocalComposition();
-        reinitializeWithComposition(
+        const res = reinitializeWithComposition(
           { type: 'serialized', value: composition.content, id: +compID },
           getEngine()!,
           allViewContextIds
         );
+        if (res.value) {
+          alert('Error loading composition: ' + res.value);
+          return;
+        }
+        // only drop the backed-up local composition once the load actually succeeded
+        await clearLocalComposition();
       }}
     >
       Load Composition

@@ -28,13 +28,21 @@ pub struct CrossfadeConfig {
 
 impl CrossfadeConfig {
   pub fn get_amp_factor(&self, grain_phase: f32, grain_len_samples: f32) -> f32 {
-    let crossfade_in_phase =
-      dsp::smoothstep(0., self.start_len_samples / grain_len_samples, grain_phase);
-    let crossfade_out_phase = dsp::smoothstep(
-      1. - self.end_len_samples / grain_len_samples,
-      1.,
-      grain_phase,
-    );
+    // zero-length crossfades make smoothstep's edges coincide -> 0/0 = NaN at grain_phase == 0
+    let crossfade_in_phase = if self.start_len_samples == 0. {
+      1.
+    } else {
+      dsp::smoothstep(0., self.start_len_samples / grain_len_samples, grain_phase)
+    };
+    let crossfade_out_phase = if self.end_len_samples == 0. {
+      0.
+    } else {
+      dsp::smoothstep(
+        1. - self.end_len_samples / grain_len_samples,
+        1.,
+        grain_phase,
+      )
+    };
 
     crossfade_in_phase * (1. - crossfade_out_phase)
   }
@@ -108,13 +116,15 @@ impl Grain {
         break;
       }
 
-      let grain_phase = dsp::mix(frame_phase, old_phase, new_phase);
+      let grain_phase = dsp::mix(frame_phase, new_phase, old_phase);
 
       let base_sample = dsp::read_interpolated(sample_data, sample_ix_in_sample_data);
       let crossfade_amp_factor = crossfade.get_amp_factor(grain_phase, grain_len_samples);
       output[sample_ix_in_frame] += base_sample * crossfade_amp_factor;
 
-      frame_phase += 1. / (samples_this_frame - 1).max(1) as f32;
+      // step by 1/N so the frame covers [frame_start, frame_end): sample k lands at
+      // frame_start + k*rate and the next frame starts exactly at frame_end
+      frame_phase += 1. / samples_this_frame as f32;
     }
 
     self.phase = new_phase;
@@ -195,9 +205,13 @@ pub extern "C" fn sampler_process(ctx: *mut SamplerCtx) {
     return;
   }
 
-  for grain in &mut ctx.active_grains {
-    grain.process(&ctx.sample_data, &mut ctx.output_buf);
-  }
+  let SamplerCtx {
+    sample_data,
+    active_grains,
+    output_buf,
+    ..
+  } = ctx;
+  active_grains.retain_mut(|grain| !grain.process(sample_data, output_buf));
 }
 
 #[no_mangle]

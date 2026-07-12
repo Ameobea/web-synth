@@ -169,7 +169,7 @@ export const storeRemoteSample = async (
   const buf = new Float32Array(data.length);
   data.copyFromChannel(buf, 0);
 
-  const res = await fetch(buildURL(`/remote_samples?name=${descriptor.name}`), {
+  const res = await fetch(buildURL(`/remote_samples?name=${encodeURIComponent(descriptor.name)}`), {
     method: 'POST',
     body: buf.buffer,
   });

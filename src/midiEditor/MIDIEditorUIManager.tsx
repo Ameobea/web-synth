@@ -113,7 +113,7 @@ export class ManagedMIDIEditorUIInstance {
       // }
 
       if (this.manager.parentInst.playbackHandler.recordingCtx) {
-        this.manager.parentInst.playbackHandler.recordingCtx.onAttack(note);
+        this.manager.parentInst.playbackHandler.recordingCtx.onAttack(note, velocity);
       }
     },
     onRelease: (note, velocity) => {
@@ -251,7 +251,20 @@ export class MIDIEditorUIManager {
     }
 
     inst.instance.uiInst = instance;
+    if (!this.activeUIInstance) {
+      this.activeUIInstance = instance;
+    }
     this.instances.set(instances);
+  }
+
+  private pickFallbackActiveUIInstance() {
+    for (const inst of get(this.instances)) {
+      if (inst.type === 'midiEditor' && inst.isExpanded && inst.instance.uiInst) {
+        this.activeUIInstance = inst.instance.uiInst;
+        return;
+      }
+    }
+    this.activeUIInstance = undefined;
   }
 
   private setMinimapForID(id: string, svg: SVGSVGElement) {
@@ -278,15 +291,14 @@ export class MIDIEditorUIManager {
       return;
     }
 
+    let needsNewActiveUIInstance = false;
     if (inst.type === 'midiEditor' && inst.instance.uiInst) {
       const renderMinimapPromise = renderMIDIMinimap(
         inst.instance.serializeLines(),
         this.parentInst.baseView.beatsPerMeasure
       );
 
-      if (this.activeUIInstance === inst.instance.uiInst) {
-        this.activeUIInstance = undefined;
-      }
+      needsNewActiveUIInstance = this.activeUIInstance === inst.instance.uiInst;
 
       inst.instance.uiInst?.destroy();
       inst.instance.uiInst = undefined;
@@ -294,6 +306,9 @@ export class MIDIEditorUIManager {
       renderMinimapPromise.then(svg => this.setMinimapForID(id, svg));
     }
     inst.isExpanded = false;
+    if (needsNewActiveUIInstance) {
+      this.pickFallbackActiveUIInstance();
+    }
 
     this.resizeInstances(instances);
     this.instances.set(instances);
@@ -437,8 +452,12 @@ export class MIDIEditorUIManager {
       return;
     }
 
+    const wasActive = !!this.activeUIInstance && this.activeUIInstance === midiEditor.uiInst;
     midiEditor.destroy();
     insts.splice(insts.indexOf(inst), 1);
+    if (wasActive) {
+      this.pickFallbackActiveUIInstance();
+    }
     this.instances.set(insts);
     this.resizeInstances(insts);
     setTimeout(() => updateConnectables(this.vcId, get_midi_editor_audio_connectables(this.vcId)));

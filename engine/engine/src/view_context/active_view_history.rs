@@ -72,9 +72,9 @@ impl ActiveViewHistory {
         if self.index > i {
           self.index -= 1;
         }
+      } else {
+        i += 1;
       }
-
-      i += 1;
     }
   }
 }
@@ -141,6 +141,29 @@ mod tests {
 
     let view = history.redo().unwrap();
     assert_eq!(view.subgraph_id, two);
+  }
+
+  #[test]
+  fn history_filter_consecutive_removals() {
+    let one = Uuid::from_bytes([1; 16]);
+    let two = Uuid::from_bytes([2; 16]);
+    let seven = Uuid::from_bytes([7; 16]);
+
+    let mut history = ActiveViewHistory::default();
+
+    history.set_active_view(one, one);
+    history.set_active_view(seven, seven);
+    history.set_active_view(seven, seven);
+    history.set_active_view(two, two);
+
+    history.filter(|view| view.subgraph_id != seven);
+
+    assert_eq!(history.history.len(), 2);
+    assert!(history.history.iter().all(|view| view.subgraph_id != seven));
+    assert_eq!(history.index, 2);
+
+    let view = history.undo().unwrap();
+    assert_eq!(view.subgraph_id, one);
   }
 
   #[test]

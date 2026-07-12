@@ -28,11 +28,13 @@ const EqualizerCtxById = new Map<
 
 const getEqualizerDOMElementId = (vcId: string) => `equalizer-${vcId}`;
 
-const deserializeEqualizer = (serialized: string): EqualizerState => {
+const deserializeEqualizer = (stateKey: string, serialized: string): EqualizerState => {
   try {
     return JSON.parse(serialized);
   } catch (err) {
     console.warn('Error deserializing equalizer state: ', err);
+    // clear the bad key so the default state doesn't get persisted over it on unload
+    localStorage.removeItem(stateKey);
     return buildDefaultEqualizerState();
   }
 };
@@ -51,7 +53,7 @@ export const init_equalizer = (stateKey: string) => {
 
   const serialized = localStorage.getItem(stateKey);
   const initialState: EqualizerState = serialized
-    ? deserializeEqualizer(serialized)
+    ? deserializeEqualizer(stateKey, serialized)
     : buildDefaultEqualizerState();
 
   const ctx = new AudioContext();

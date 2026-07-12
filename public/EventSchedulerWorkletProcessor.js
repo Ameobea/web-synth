@@ -96,7 +96,7 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
           break;
         }
         case 'scheduleBeats': {
-          this.scheduleEventBeats(event.data.beats, event.data.cbId);
+          this.scheduleEventBeats(event.data.beats, event.data.cbId, event.data.midiEventType);
           break;
         }
         case 'scheduleBeatsRelative': {
@@ -105,7 +105,7 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
         }
         case 'scheduleMIDI': {
           const d = event.data;
-          globalThis.transport.scheduleMIDI(d.targetID, d.beat, d.eventType, d.param0, d.param1, d.id);
+          this.scheduleTransportMIDI(d.targetID, d.beat, d.eventType, d.param0, d.param1, d.id);
           break;
         }
         case 'insertLiveMIDI': {
@@ -167,10 +167,21 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
     // Schedule any events that we missed while the Wasm instance was initializing
     this.pendingEvents.forEach(event =>
       event.time === null
-        ? this.scheduleEventBeats(event.beats, event.cbId)
+        ? this.scheduleEventBeats(event.beats, event.cbId, event.midiEventType)
         : this.scheduleEvent(event.time, event.cbId)
     );
     this.pendingEvents = null;
+  }
+
+  /**
+   * Clamps late-arriving events up to the current beat while running so they fire at the next
+   * window's offset 0 instead of falling below consumer poll cursors and being silently dropped.
+   */
+  scheduleTransportMIDI(targetID, beat, eventType, param0, param1, id) {
+    if (this.isStarted) {
+      beat = Math.max(beat, globalThis.transport.beatAt(currentFrame));
+    }
+    globalThis.transport.scheduleMIDI(targetID, beat, eventType, param0, param1, id);
   }
 
   /**
@@ -183,7 +194,7 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
     for (const event of events) {
       if (event.at.type === 'beats' && event.at.beat >= curBeat) {
         if (event.mailboxID) {
-          globalThis.transport.scheduleMIDI(
+          this.scheduleTransportMIDI(
             event.mailboxID,
             event.at.beat,
             event.midiEventType,
@@ -192,7 +203,7 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
             event.cbId
           );
         } else {
-          this.scheduleEventBeats(event.at.beat, event.cbId);
+          this.scheduleEventBeats(event.at.beat, event.cbId, event.midiEventType);
         }
         scheduledCount += 1;
       } else if (event.at.type === 'time' && event.at.time >= currentTime) {
@@ -213,13 +224,13 @@ class EventSchedulerWorkletProcessor extends AudioWorkletProcessor {
     this.wasmInstance.exports.schedule(time, cbId);
   }
 
-  scheduleEventBeats(beats, cbId) {
+  scheduleEventBeats(beats, cbId, midiEventType) {
     if (!this.wasmInstance) {
-      this.pendingEvents.push({ time: null, beats, cbId });
+      this.pendingEvents.push({ time: null, beats, cbId, midiEventType });
       return;
     }
 
-    this.wasmInstance.exports.schedule_beats(beats, cbId, -1, 0, 0, 0);
+    this.wasmInstance.exports.schedule_beats(beats, cbId, -1, midiEventType ?? -1, 0, 0);
   }
 
   process(_inputs, _outputs, _params) {

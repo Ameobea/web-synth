@@ -181,7 +181,7 @@ const handleMIDIFileUpload = async (
     const bytes = new Uint8Array(uploadedFile.fileContent);
 
     const notesByMIDINumber: Map<number, { startPoint: number; length: number }[]> = new Map();
-    for (let i = 0; i < 127; i++) {
+    for (let i = 0; i <= 127; i++) {
       notesByMIDINumber.set(i, []);
     }
 

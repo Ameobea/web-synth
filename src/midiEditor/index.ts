@@ -313,7 +313,8 @@ export class MIDIEditorInstance {
   public setLoopPoint(loopPoint: number | null): boolean {
     const didUpdate = this.playbackHandler.setLoopPoint(loopPoint);
     if (didUpdate) {
-      this.uiManager.updateLoopPoint(loopPoint);
+      // the playback handler may have normalized the value (`<= 0` -> null)
+      this.uiManager.updateLoopPoint(this.playbackHandler.getLoopPoint());
     }
     return didUpdate;
   }

@@ -52,7 +52,14 @@ pub fn write_to_midi(name: String, note_data: &[u8]) -> Vec<u8> {
       MidiMessage::note_off(note.line_ix as u8, 90, 0),
     ))
   }
-  midi_events.sort_unstable_by_key(|evt| evt.get_time());
+  // note-offs sort before note-ons at equal ticks so re-import doesn't drop the second note
+  midi_events.sort_unstable_by_key(|evt| {
+    let is_note_on = match evt.get_event() {
+      Event::Midi(msg) => msg.status() == Status::NoteOn,
+      Event::Meta(_) => false,
+    };
+    (evt.get_time(), is_note_on)
+  });
   builder.add_static_track(midi_events.iter());
   builder.set_name(0, name);
 
@@ -244,6 +251,7 @@ pub fn load_midi_to_raw_note_bytes(
       if velocity == 0 {
         info!("Velocity is zero; handling as note off event.");
         handle_note_off(context);
+        return;
       }
 
       if context.on_notes[note_id as usize] != NO_PLAYING_NOTE {

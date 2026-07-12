@@ -286,11 +286,13 @@ const looperSlice = createSlice({
       }
 
       instState.modules.splice(action.payload.moduleIx, 1);
-
-      // This has the effect of shifting down modules in the backend, so states should match
-      instState.looperNode.deleteModule(instState.modules.length);
+      instState.looperNode.deleteModule(action.payload.moduleIx);
 
       if (instState.modules.length <= 1) {
+        instState.activeModuleIx = 0;
+        if (instState.modules.length > 0) {
+          instState.looperNode.setActiveModuleIx(0);
+        }
         updateLooperConnectables(action.payload.vcId);
         return;
       }

@@ -65,7 +65,7 @@ export class LooperNode {
     this.midiNodes = [];
 
     serialized.modules?.forEach((module, moduleIx) => {
-      this.midiNodes.push(this.buildMIDINode(moduleIx));
+      this.midiNodes.push(this.buildMIDINode());
 
       module.banks?.forEach((bank, bankIx) => {
         this.setLoopLenBeats(moduleIx, bankIx, bank.lenBeats);
@@ -164,16 +164,21 @@ export class LooperNode {
         cbs => cbs.enableRxAudioThreadScheduling?.mailboxIDs ?? []
       )
     );
-    const needsUIThreadScheduling =
-      mailboxIDs.length > 0 && mailboxIDs.length !== mailboxIDs.length;
-
-    return { mailboxIDs, needsUIThreadScheduling };
+    return {
+      mailboxIDs,
+      needsUIThreadScheduling: this.midiNodes[moduleIx].needsUIThreadScheduling,
+    };
   }
 
-  private buildMIDINode(moduleIx: number): MIDINode {
+  private buildMIDINode(): MIDINode {
     const node = new MIDINode();
 
+    // Look up the index at callback time; deleting a module shifts `midiNodes`
     node.registerOnConnectionsChangedCb(() => {
+      const moduleIx = this.midiNodes.indexOf(node);
+      if (moduleIx === -1) {
+        return;
+      }
       this.postMessage({
         type: 'updateMIDISchedulingInfoForModule',
         moduleIx,
@@ -186,13 +191,15 @@ export class LooperNode {
 
   public setActiveModuleIx(moduleIx: number) {
     while (this.midiNodes.length <= moduleIx) {
-      this.midiNodes.push(this.buildMIDINode(this.midiNodes.length));
+      this.midiNodes.push(this.buildMIDINode());
     }
 
     this.postMessage({ type: 'setActiveModuleIx', moduleIx });
   }
 
   public deleteModule(moduleIx: number) {
+    const [removed] = this.midiNodes.splice(moduleIx, 1);
+    removed?.dispose();
     this.postMessage({ type: 'deleteModule', moduleIx });
   }
 
@@ -229,11 +236,13 @@ export class LooperNode {
     });
     this.workletNode.port.onmessage = evt => {
       switch (evt.data.type) {
+        // interactiveOnly: the AWP already delivers to audio-thread-scheduled (mailbox) consumers
+        // directly, so these port echoes must only hit UI-thread consumers
         case 'playNote':
-          this.midiNodes[evt.data.moduleIx]?.onAttack(evt.data.note, 90);
+          this.midiNodes[evt.data.moduleIx]?.onAttack(evt.data.note, 90, true);
           break;
         case 'releaseNote':
-          this.midiNodes[evt.data.moduleIx]?.onRelease(evt.data.note, 90);
+          this.midiNodes[evt.data.moduleIx]?.onRelease(evt.data.note, 90, true);
           break;
         case 'phaseSAB':
           this.phaseSAB = new Float32Array(evt.data.phaseSAB);

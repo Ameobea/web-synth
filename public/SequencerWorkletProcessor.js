@@ -17,7 +17,8 @@ class SequencerWorkletProcessor extends AudioWorkletProcessor {
         }
         case 'start': {
           this.startBeat = evt.data.startBeat ?? globalThis.curBeat;
-          this.lastBeat = Math.trunc(evt.data.startBeat / this.config.beatRatio);
+          // Fires the mark when starting exactly on its boundary without replaying a mid-cell past mark
+          this.lastBeat = Math.ceil(this.startBeat / this.config.beatRatio) - 1;
           break;
         }
         case 'stop': {
@@ -40,11 +41,15 @@ class SequencerWorkletProcessor extends AudioWorkletProcessor {
   }
 
   process(_inputs, _outputs, _params) {
-    if (this.startBeat === null || !this.config) {
+    if (this.startBeat === null || !this.config || !globalThis.globalBeatCounterStarted) {
       return true;
     }
 
-    const beatsSinceStart = globalThis.curBeat;
+    // Transport read avoids the one-frame staleness of `globalThis.curBeat` for nodes that
+    // process before the event scheduler within a render quantum
+    const beatsSinceStart = globalThis.transport
+      ? globalThis.transport.beatAt(currentFrame)
+      : globalThis.curBeat;
     const curQuantizedBeat = Math.trunc(beatsSinceStart / this.config.beatRatio);
 
     if (curQuantizedBeat !== this.lastBeat) {

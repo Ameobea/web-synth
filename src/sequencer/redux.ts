@@ -142,9 +142,38 @@ const actionGroups = {
         return state;
       }
 
+      const sampleBank =
+        state.sampleBank === 'LOADING'
+          ? state.sampleBank
+          : Object.fromEntries(
+              Object.entries(state.sampleBank)
+                .filter(([k]) => +k !== voiceIx)
+                .map(([k, v]) => [+k > voiceIx ? +k - 1 : +k, v])
+            );
+
+      let markEditState = state.markEditState;
+      if (markEditState) {
+        if (markEditState.voiceIx === voiceIx) {
+          markEditState = null;
+        } else if (markEditState.voiceIx > voiceIx) {
+          markEditState = { ...markEditState, voiceIx: markEditState.voiceIx - 1 };
+        }
+      }
+
+      const newVoiceCount = state.voices.length - 1;
       return reschedule({
         ...state,
         marks: R.remove(voiceIx, 1, state.marks),
+        voices: R.remove(voiceIx, 1, state.voices),
+        activeBeats: R.remove(voiceIx, 1, state.activeBeats),
+        sampleBank,
+        markEditState,
+        currentEditingVoiceIx: Math.min(
+          state.currentEditingVoiceIx > voiceIx
+            ? state.currentEditingVoiceIx - 1
+            : state.currentEditingVoiceIx,
+          newVoiceCount - 1
+        ),
       });
     },
   }),
@@ -187,6 +216,9 @@ const actionGroups = {
 
       if (state.isPlaying) {
         state.awpHandle.port.postMessage({ type: 'stop' });
+        // Releases scheduled during the hold window are cancelled by `stopAll`, so flush
+        // anything still held downstream
+        state.midiOutputs.forEach(output => output.clearAll());
         return { ...state, isPlaying: false, curActiveMarkIx: null };
       } else {
         state.awpHandle.port.postMessage({ type: 'start', startBeat: startBeat ?? 0 });
@@ -451,7 +483,7 @@ export const buildSequencerInputMIDINode = (vcId: string): MIDINode => {
         !state ||
         !state.markEditState ||
         R.isNil(state.markEditState.editingMarkIx) ||
-        state.voices[state.markEditState.editingMarkIx].type !== 'midi'
+        state.voices[state.markEditState.voiceIx].type !== 'midi'
       ) {
         return;
       }

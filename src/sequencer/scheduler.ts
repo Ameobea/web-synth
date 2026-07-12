@@ -76,7 +76,7 @@ export const SequencerBeatPlayerByVoiceType: {
     }
 
     // TODO: Make the duration of the beat that the gate is activated for configurable
-    const beatDurationMS = (state.bpm * 1000) / 60;
+    const beatDurationMS = (60 / getGlobalBpm()) * 1000;
     const holdDurationMS = beatDurationMS * 0.72;
 
     dstGate?.offset.setValueAtTime(

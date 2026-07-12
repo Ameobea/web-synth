@@ -50,6 +50,8 @@ export const init_looper = (stateKey: string) => {
         return deserializeLooper(s);
       } catch (err) {
         console.warn('Error deserializing looper state', err);
+        // Clear the corrupt entry so the default state doesn't get persisted over it
+        localStorage.removeItem(stateKey);
         return buildDefaultLooperInstState();
       }
     })

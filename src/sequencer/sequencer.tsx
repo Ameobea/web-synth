@@ -98,7 +98,12 @@ const serializeSequencer = (vcId: string): string => {
     sampleBank:
       typeof sampleBank === 'string'
         ? (PendingSampleBanksByVcId.get(vcId) ?? {})
-        : Object.values(sampleBank).map(item => (item ? item.descriptor : item)),
+        : Object.fromEntries(
+            Object.entries(sampleBank).map(([voiceIx, item]) => [
+              voiceIx,
+              item ? item.descriptor : item,
+            ])
+          ),
     marks,
     bpm,
     isPlaying,
@@ -270,18 +275,29 @@ const deserializeSequencer = (serialized: string, vcId: string): SequencerReduxS
 
 const loadInitialState = (stateKey: string, vcId: string) => {
   const serializedState = localStorage.getItem(stateKey);
-  if (!serializedState) {
-    return buildInitialState(vcId);
+  if (serializedState) {
+    try {
+      return deserializeSequencer(serializedState, vcId);
+    } catch (_err) {
+      console.error(
+        `Failed to parse serialized state for sequencer id ${vcId}; clearing it and building default state.`
+      );
+      // Clear the corrupt entry so the default state doesn't get persisted over it
+      localStorage.removeItem(stateKey);
+    }
   }
 
-  try {
-    return deserializeSequencer(serializedState, vcId);
-  } catch (_err) {
-    console.error(
-      `Failed to parse serialized state for sequencer id ${vcId}; building default state.`
-    );
-    return buildInitialState(vcId);
-  }
+  const state = buildInitialState(vcId);
+  initSequenceAWP(vcId)
+    .then(awpHandle => {
+      const reduxInfra = SequencerInstancesMap.get(vcId);
+      reduxInfra?.dispatch(reduxInfra.actionCreators.sequencer.SET_AWP_HANDLE(awpHandle));
+    })
+    .catch(err => {
+      console.error('Failed to initialize sequencer AWP: ', err);
+      getSentry()?.captureException(err);
+    });
+  return state;
 };
 
 const LazySequencerUI: React.FC<SequencerReduxInfra> = props => (

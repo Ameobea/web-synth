@@ -17,7 +17,7 @@ type PendingEvent =
       time: number | null;
       beats: number | null;
       payload:
-        | { type: 'cbId'; cbId: number }
+        | { type: 'cbId'; cbId: number; midiEventType?: MIDIEventType }
         | {
             type: 'midi';
             mailboxID: string;
@@ -108,7 +108,10 @@ export const startAll = (startBeat = getCurBeat()) => {
   isStarted = true;
   lastStartTime = ctx.currentTime;
   SchedulerHandle.port.postMessage({ type: 'start', startBeat });
-  scheduleEventBeats(0, () => StartCBs.forEach(cb => cb(startBeat)));
+  // Invoked synchronously rather than via a scheduled event so that events the callbacks schedule
+  // at `startBeat` itself land before consumer poll cursors advance past it; port ordering
+  // guarantees those schedule messages arrive after the AWP's start/reset.
+  StartCBs.forEach(cb => cb(startBeat));
 };
 
 /**
@@ -255,7 +258,12 @@ export const EventSchedulerInitialized = Promise.all([
               id: payload.cbId,
             });
           } else {
-            SchedulerHandle!.port.postMessage({ type: 'scheduleBeats', beats, cbId: payload.cbId });
+            SchedulerHandle!.port.postMessage({
+              type: 'scheduleBeats',
+              beats,
+              cbId: payload.cbId,
+              midiEventType: payload.midiEventType,
+            });
           }
         } else {
           if (payload.type === 'midi') {
@@ -315,14 +323,27 @@ export const scheduleEventTimeRelativeToCurTime = (
   cb: () => void
 ): number => scheduleEventTimeAbsolute(ctx.currentTime + secondsFromNow, cb);
 
-export const scheduleEventBeats = (beats: number, cb: () => void): number => {
+/**
+ * @param midiEventType Optional ordering hint; at equal beats, higher event types fire first
+ * (release before attack) matching the transport's tie-break.
+ */
+export const scheduleEventBeats = (
+  beats: number,
+  cb: () => void,
+  midiEventType?: MIDIEventType
+): number => {
   const cbId = registerCb(cb);
   if (!SchedulerHandle) {
-    PendingEvents.push({ type: 'schedule', time: null, beats, payload: { type: 'cbId', cbId } });
+    PendingEvents.push({
+      type: 'schedule',
+      time: null,
+      beats,
+      payload: { type: 'cbId', cbId, midiEventType },
+    });
     return cbId;
   }
 
-  SchedulerHandle.port.postMessage({ type: 'scheduleBeats', beats, cbId });
+  SchedulerHandle.port.postMessage({ type: 'scheduleBeats', beats, cbId, midiEventType });
   return cbId;
 };
 

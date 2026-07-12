@@ -65,6 +65,8 @@ export const init_faust_editor = (stateKey: string) => {
         return Option.of(parsed);
       } catch (_err) {
         console.error('Error parsing localstorage content for Faust editor; resetting to scratch.');
+        // clear the bad key so the default state doesn't get persisted over it on unload
+        localStorage.removeItem(stateKey);
         return Option.none();
       }
     })

@@ -76,6 +76,10 @@ class LooperAWP extends AudioWorkletProcessor {
       }
       case 'deleteModule': {
         this.wasmInstance.exports.looper_delete_module(data.moduleIx);
+        this.mailboxIDsByModuleIx.splice(data.moduleIx, 1);
+        this.mailboxIDsByModuleIx.push(null);
+        this.needsUIThreadSchedulingByModuleIX.splice(data.moduleIx, 1);
+        this.needsUIThreadSchedulingByModuleIX.push(true);
         break;
       }
       case 'setTransitionAlgorithm': {
@@ -150,6 +154,7 @@ class LooperAWP extends AudioWorkletProcessor {
     };
     const compiledModule = await WebAssembly.compile(wasmBytes);
     this.wasmInstance = await WebAssembly.instantiate(compiledModule, importObject);
+    this.wasmInstance.exports.looper_init();
 
     this.pendingEvents.forEach(data => this.handleMessage(data));
     this.pendingEvents = [];

@@ -39,6 +39,8 @@ struct ScheduledEvent {
   pub time: f64,
   pub cb_id: i32,
   pub midi_evt: Option<MidiEvent>,
+  /// MIDI event type of the event the callback will fire, when known; only used for ordering
+  pub event_type_hint: Option<u8>,
 }
 
 impl Eq for ScheduledEvent {}
@@ -48,14 +50,8 @@ impl Ord for ScheduledEvent {
     // when sending MIDI events, we always need to make sure to send release events before
     // attack events.  This will prevent MIDI event consumers from getting into a bad state due
     // to multiple attacks for the same note etc.
-    let this = (
-      FloatOrd(self.time),
-      self.midi_evt.as_ref().map(|m| Reverse(m.event_type)),
-    );
-    let other = (
-      FloatOrd(other.time),
-      other.midi_evt.as_ref().map(|m| Reverse(m.event_type)),
-    );
+    let this = (FloatOrd(self.time), self.event_type_hint.map(Reverse));
+    let other = (FloatOrd(other.time), other.event_type_hint.map(Reverse));
 
     this.cmp(&other)
   }
@@ -67,14 +63,17 @@ impl PartialOrd for ScheduledEvent {
   }
 }
 
-static mut SCHEDULED_EVENTS: BinaryHeap<ScheduledEvent, Min, 1048576> = BinaryHeap::new();
-static mut SCHEDULED_BEAT_EVENTS: BinaryHeap<ScheduledEvent, Min, 1048576> = BinaryHeap::new();
+const HEAP_CAPACITY: usize = 65536;
 
-fn scheduled_events() -> &'static mut BinaryHeap<ScheduledEvent, Min, 1048576> {
+static mut SCHEDULED_EVENTS: BinaryHeap<ScheduledEvent, Min, HEAP_CAPACITY> = BinaryHeap::new();
+static mut SCHEDULED_BEAT_EVENTS: BinaryHeap<ScheduledEvent, Min, HEAP_CAPACITY> =
+  BinaryHeap::new();
+
+fn scheduled_events() -> &'static mut BinaryHeap<ScheduledEvent, Min, HEAP_CAPACITY> {
   ref_static_mut!(SCHEDULED_EVENTS)
 }
 
-fn scheduled_beat_events() -> &'static mut BinaryHeap<ScheduledEvent, Min, 1048576> {
+fn scheduled_beat_events() -> &'static mut BinaryHeap<ScheduledEvent, Min, HEAP_CAPACITY> {
   ref_static_mut!(SCHEDULED_BEAT_EVENTS)
 }
 
@@ -95,6 +94,7 @@ pub extern "C" fn schedule(time: f64, cb_id: i32) {
       time,
       cb_id,
       midi_evt: None,
+      event_type_hint: None,
     })
     .expect("`SCHEDULED_EVENTS` is full");
 }
@@ -104,7 +104,7 @@ pub extern "C" fn schedule_beats(
   beats: f64,
   cb_id: i32,
   mailbox_ix: i32,
-  midi_event_type: u8,
+  midi_event_type: i32,
   midi_param_0: f32,
   midi_param_1: f32,
 ) {
@@ -115,7 +115,7 @@ pub extern "C" fn schedule_beats(
   let midi_evt = if mailbox_ix >= 0 {
     Some(MidiEvent {
       mailbox_ix: mailbox_ix as usize,
-      event_type: midi_event_type,
+      event_type: midi_event_type as u8,
       param_0: midi_param_0,
       param_1: midi_param_1,
     })
@@ -128,6 +128,7 @@ pub extern "C" fn schedule_beats(
       time: beats,
       cb_id,
       midi_evt,
+      event_type_hint: (midi_event_type >= 0).then(|| midi_event_type as u8),
     })
     .expect("`SCHEDULED_BEAT_EVENTS` is full");
 }

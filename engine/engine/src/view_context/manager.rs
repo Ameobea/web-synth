@@ -657,8 +657,8 @@ impl ViewContextManager {
 
     // Update view history to remove entries referencing deleted subgraphs or VCs
     self.active_view_history.filter(|active_view| {
-      subgraphs_to_delete.contains(&active_view.subgraph_id)
-        || vcs_to_delete.contains(&active_view.vc_id)
+      !subgraphs_to_delete.contains(&active_view.subgraph_id)
+        && !vcs_to_delete.contains(&active_view.vc_id)
     });
 
     // Save the updated state
@@ -1116,16 +1116,29 @@ impl ViewContextManager {
         .contexts
         .iter_mut()
         .find(|vc| vc.definition.subgraph_id == subgraph_id);
-      if let Some(vc) = new_active_vc_opt {
-        vc.context.unhide();
-        self
-          .subgraphs_by_id
-          .get_mut(&subgraph_id)
-          .unwrap()
-          .active_vc_id = vc.id;
-        if self.active_subgraph_id == subgraph_id {
-          self.active_context_id = vc.id;
-        }
+      match new_active_vc_opt {
+        Some(vc) => {
+          vc.context.unhide();
+          self
+            .subgraphs_by_id
+            .get_mut(&subgraph_id)
+            .unwrap()
+            .active_vc_id = vc.id;
+          if self.active_subgraph_id == subgraph_id {
+            self.active_context_id = vc.id;
+          }
+        },
+        None => {
+          // the last VC moved out; leaving a dangling `active_vc_id` panics on next load
+          self
+            .subgraphs_by_id
+            .get_mut(&subgraph_id)
+            .unwrap()
+            .active_vc_id = Uuid::nil();
+          if self.active_subgraph_id == subgraph_id {
+            self.active_context_id = Uuid::nil();
+          }
+        },
       }
     }
     js::set_subgraphs(
@@ -1144,6 +1157,8 @@ impl ViewContextManager {
         graph_editor.arrange_nodes(Some(&vfc_ids), (20, 400));
       }
     }
+
+    self.save_all();
   }
 
   fn set_view(&mut self, subgraph_id: Uuid, vc_id: Uuid) -> Result<(), ()> {
