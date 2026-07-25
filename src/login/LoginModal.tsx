@@ -3,7 +3,7 @@ import React from 'react';
 import { login, register } from 'src/api';
 import type { ModalCompProps } from 'src/controls/Modal';
 import { setLoginToken } from 'src/persistance';
-import { getSentry } from 'src/sentry';
+import { logEvent } from 'src/eventAnalytics';
 import './LoginModal.css';
 
 type LoginModalProps = ModalCompProps<undefined>;
@@ -71,10 +71,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onSubmit, onCancel }) =>
       <div className='login-modal-buttons-container'>
         <button
           onClick={() => {
-            getSentry()?.captureMessage('Login button clicked', {
-              level: 'info',
-              tags: { username },
-            });
+            logEvent('auth', 'login-clicked', { username });
             doLogin(login);
           }}
         >
@@ -82,10 +79,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onSubmit, onCancel }) =>
         </button>
         <button
           onClick={() => {
-            getSentry()?.captureMessage('Register button clicked', {
-              level: 'info',
-              tags: { username },
-            });
+            logEvent('auth', 'register-clicked', { username });
             doLogin(register);
           }}
         >

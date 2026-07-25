@@ -389,7 +389,7 @@ export class BuildWavetableInstance {
       getSentry()?.captureException(err);
       return null;
     });
-    if (!res || this.commitRenderSeq > dispatchID) {
+    if (!res || this.commitRenderSeq > dispatchID || this.destroyed) {
       return;
     }
     const { waveformImage, waveformSamples } = res;
@@ -401,6 +401,9 @@ export class BuildWavetableInstance {
         WAVEFORM_IMAGE_HEIGHT_PX
       )
     );
+    if (this.destroyed) {
+      return;
+    }
 
     const texture = PIXI.Texture.from(imageBitmap, {
       width: WAVEFORM_IMAGE_WIDTH_PX,

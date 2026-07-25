@@ -52,6 +52,8 @@
     preset: WavetablePreset,
     name?: string
   ): Promise<WavetableBank> => {
+    // `preset` can be a `$state` proxy, which can't be structured-cloned through comlink
+    preset = $state.snapshot(preset);
     const rendered: Float32Array[] = await worker.renderWavetable(
       preset.waveforms.map(w => w.instState)
     );

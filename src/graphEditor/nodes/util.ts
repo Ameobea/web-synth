@@ -76,7 +76,8 @@ const tryDisconnect = (src: AudioNode, dst: AudioNode | AudioParam) => {
   try {
     (src as any).disconnect(dst);
   } catch (err) {
-    if (err instanceof DOMException && err.message.includes('is not connected')) {
+    // not-connected message differs between browsers; Firefox says "we're not connected to"
+    if (err instanceof DOMException && err.name === 'InvalidAccessError') {
       return;
     }
     throw err;

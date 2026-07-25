@@ -14,7 +14,7 @@ import type { ParamSource } from 'src/fmSynth/ParamSource';
 import type { AdsrParams } from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import FlatButton from 'src/misc/FlatButton';
 import HelpIcon from 'src/misc/HelpIcon';
-import { getSentry } from 'src/sentry';
+import { logEvent } from 'src/eventAnalytics';
 import { filterNils } from 'src/util';
 
 const EFFECT_TYPE_SETTING = {
@@ -795,9 +795,7 @@ const EffectManagement: React.FC<EffectManagementProps> = ({
         {effectIx !== 0 ? (
           <FlatButton
             onClick={() => {
-              getSentry()?.captureMessage('Shift FM synth effect position', {
-                extra: { direction: 'up', effectIx },
-              });
+              logEvent('fm-synth', 'shift-effect-position', { direction: 'up', effectIx });
               const newEffects = [...operatorEffects];
               const swapEffect = operatorEffects[effectIx - 1];
               newEffects[effectIx - 1] = newEffects[effectIx];
@@ -811,9 +809,7 @@ const EffectManagement: React.FC<EffectManagementProps> = ({
         {operatorEffects[effectIx + 1] ? (
           <FlatButton
             onClick={() => {
-              getSentry()?.captureMessage('Shift FM synth effect position', {
-                extra: { direction: 'down', effectIx },
-              });
+              logEvent('fm-synth', 'shift-effect-position', { direction: 'down', effectIx });
               const newEffects = [...operatorEffects];
               const swapEffect = operatorEffects[effectIx + 1];
               newEffects[effectIx + 1] = newEffects[effectIx];
@@ -1014,8 +1010,8 @@ class ConfigureEffects extends React.Component<ConfigureEffectsProps, ConfigureE
               type: 'button',
               label: 'add effect',
               action: () => {
-                getSentry()?.captureMessage('Add FM Synth Effect', {
-                  extra: { selectedEffectType: this.state.selectedEffectType },
+                logEvent('fm-synth', 'add-effect', {
+                  selectedEffectType: this.state.selectedEffectType,
                 });
                 const activeEffectCount = state.filter(e => e).length;
                 if (activeEffectCount === state.length) {

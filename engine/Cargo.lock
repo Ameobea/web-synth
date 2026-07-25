@@ -1125,6 +1125,8 @@ version = "0.1.0"
 dependencies = [
  "common",
  "dsp",
+ "hound",
+ "rustfft",
 ]
 
 [[package]]

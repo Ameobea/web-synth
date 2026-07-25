@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ControlPanel from 'react-control-panel';
 
 import Loading from 'src/misc/Loading';
-import { getSentry } from 'src/sentry';
+import { logEvent } from 'src/eventAnalytics';
 import { AsyncOnce, elemInView } from 'src/util';
 
 export interface SpectrumVizSettings {
@@ -195,9 +195,7 @@ const SpectrumVisualizationInner: React.FC<SpectrumVisualizationProps> = ({
 
   const onSettingChange = useCallback(
     (_label: string, _value: any, { color_fn, scaler_fn }: SpectrumVizSettings) => {
-      getSentry()?.captureMessage('Spectrum viz change settings', {
-        extra: { color_fn, scaler_fn },
-      });
+      logEvent('spectrum-viz', 'change-settings', { color_fn, scaler_fn });
       spectrumModule.current!.set_conf(ctxPtr!, +color_fn, +scaler_fn);
     },
     [ctxPtr]

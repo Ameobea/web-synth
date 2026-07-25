@@ -5,6 +5,7 @@ import { Provider, shallowEqual, useDispatch, useSelector } from 'react-redux';
 import './SynthDesigner.css';
 import { getSynthPreset, getSynthVoicePreset, saveSynthPreset } from 'src/api';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
+import { logEvent } from 'src/eventAnalytics';
 import { updateConnectables } from 'src/patchNetwork/interface';
 import { store, type ReduxStore } from 'src/redux';
 import { fetchSynthPresets, type SynthVoicePreset } from 'src/redux/modules/presets';
@@ -49,6 +50,7 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
         label: 'add empty',
         type: 'button',
         action: () => {
+          logEvent('synth-designer', 'add-voice-empty');
           const vcId = stateKey.split('_')[1]!;
           synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
@@ -91,6 +93,10 @@ const AddModuleControls: React.FC<AddModuleControlsProps> = ({
             return;
           }
 
+          logEvent('synth-designer', 'add-voice-from-preset', {
+            presetId: pickedPreset.preset,
+            presetName: pickedPreset.name,
+          });
           const vcId = stateKey.split('_')[1]!;
           synthDesignerDispatch(synthDesignerActionCreators.synthDesigner.ADD_SYNTH_MODULE());
           synthDesignerDispatch(
@@ -182,6 +188,10 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
             }
           }
 
+          logEvent('synth-designer', 'load-full-preset', {
+            presetId: pickedPreset.preset,
+            presetName: pickedPreset.name,
+          });
           dispatch(synthDesignerActionCreators.SET_SYNTH_PRESET(body));
           const newConnectables = get_synth_designer_audio_connectables(stateKey);
           const vcId = stateKey.split('_')[1]!;
@@ -202,6 +212,7 @@ const FullPresetControlsInner: React.FC<FullPresetControlsProps> = ({
               description: description ?? '',
               body: { voices: presetBody },
             });
+            logEvent('synth-designer', 'save-full-preset', { voiceCount: presetBody.length });
           } catch (_err) {
             // already reported to Sentry in `apiPost`
           }

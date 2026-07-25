@@ -55,7 +55,8 @@ import {
   getSubgraphPreset,
   saveSubgraphPreset as saveSubgraphPresetAPI,
 } from 'src/api';
-import { getSentry, logError } from 'src/sentry';
+import { logEvent } from 'src/eventAnalytics';
+import { logError } from 'src/sentry';
 import {
   mkGenericPresetPicker,
   type PresetDescriptor,
@@ -86,6 +87,7 @@ const confirmAndDeleteSubgraph = async (subgraphID: string) => {
     }
   }
 
+  logEvent('graph-editor', 'delete-subgraph');
   getEngine()!.delete_subgraph(subgraphID);
 };
 
@@ -120,6 +122,7 @@ export const saveSubgraphPreset = async (subgraphID: string, overrideName = fals
       tags: desc.tags ?? [],
     });
     toastSuccess('Subgraph preset saved');
+    logEvent('graph-editor', 'save-subgraph-preset');
   } catch (err) {
     logError('Error saving subgraph preset', err);
     toastError('Error saving subgraph preset: ' + `${err}`);
@@ -180,6 +183,7 @@ const duplicateSubgraph = (subgraphID: string) => {
     getState().viewContextManager.subgraphsByID[subgraphID]?.name ?? 'Cloned Subgraph';
   const serializedSubgraph = getEngine()!.serialize_subgraph(subgraphID, subgraphName);
 
+  logEvent('graph-editor', 'duplicate-subgraph');
   getEngine()!.load_serialized_subgraph(serializedSubgraph);
 };
 
@@ -309,6 +313,10 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
     removeOption.callback = (_value, _options, _event, _parentMenu, node) => {
       const vcId = node.id.toString();
       const isVc = vcId.length === 36;
+      const nodeType =
+        ((node as any).connectables as AudioConnectables | undefined)?.node?.nodeType ??
+        getState().viewContextManager.activeViewContexts.find(vc => vc.uuid === vcId)?.name;
+      logEvent('graph-editor', 'remove-node', { nodeType, isVc });
       if (isVc) {
         getEngine()!.delete_vc_by_id(vcId);
       } else {
@@ -340,7 +348,7 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
             const selectedVFcIds = Object.keys(this.selected_nodes);
             setTimeout(() => {
               getEngine()!.move_vfcs_to_subgraph(JSON.stringify(selectedVFcIds), targetSubgraphID);
-              getSentry()?.captureMessage('Moved nodes to subgraph');
+              logEvent('graph-editor', 'move-nodes-to-subgraph');
             });
           },
           parentMenu,
@@ -360,6 +368,7 @@ LGraphCanvas.prototype.getNodeMenuOptions = function (this: LGraphCanvas, node: 
       if (nodesToDuplicate.length === 0) {
         return;
       }
+      logEvent('graph-editor', 'duplicate-nodes', { count: nodesToDuplicate.length });
 
       const newIDByOldID: Map<string, string> = new Map();
 
@@ -437,6 +446,7 @@ LGraphCanvas.prototype.showLinkMenu = function (link: any, e) {
   const innerClicked = (label: any, _options: unknown, _e: unknown) => {
     switch (label) {
       case 'Delete':
+        logEvent('graph-editor', 'disconnect');
         this.graph.removeLink(link.id);
         break;
       case null:
@@ -458,6 +468,7 @@ LGraphCanvas.prototype.showLinkMenu = function (link: any, e) {
 LGraphCanvas.prototype.processNodeDblClicked = (node: LGraphNode) => {
   const nodeID = node.id as string | number;
   if (nodeID && typeof nodeID === 'string' && nodeID.length === 36) {
+    logEvent('graph-editor', 'open-node-full-ui');
     getEngine()!.switch_view_context(nodeID);
   }
 
@@ -469,6 +480,7 @@ LGraphCanvas.prototype.processNodeDblClicked = (node: LGraphNode) => {
 // deleted nodes' neighbors, and paste-cloning unregistered ForeignNodes).  Route deletion through
 // the same path as the patched "Remove" menu option and disable the built-in clipboard.
 LGraphCanvas.prototype.deleteSelectedNodes = function (this: LGraphCanvas) {
+  let deletedCount = 0;
   for (const node of Object.values(this.selected_nodes ?? {})) {
     const innerNode = ((node as any).connectables as AudioConnectables | undefined)?.node;
     if (innerNode instanceof SubgraphPortalNode) {
@@ -482,6 +494,10 @@ LGraphCanvas.prototype.deleteSelectedNodes = function (this: LGraphCanvas) {
     } else {
       removeNode(vcId);
     }
+    deletedCount += 1;
+  }
+  if (deletedCount > 0) {
+    logEvent('graph-editor', 'delete-selected-nodes', { count: deletedCount });
   }
 };
 
@@ -591,6 +607,7 @@ const createNode = (
   params?: Record<string, any> | null
 ): string => {
   const isVc = !nodeType.startsWith('customAudio/');
+  logEvent('graph-editor', 'add-node', { nodeType, isVc });
   if (isVc) {
     const engine = getEngine();
     if (!engine) {
@@ -622,7 +639,10 @@ const createNode = (
  * Adds a new subgraph to the engine and creates a subgraph portal node in the current graph so that
  * the new subgraph can be moved into and connected to.
  */
-const addSubgraph = () => getEngine()!.add_subgraph();
+const addSubgraph = () => {
+  logEvent('graph-editor', 'add-subgraph');
+  return getEngine()!.add_subgraph();
+};
 
 const addSavedSubgraph = async () => {
   let pickedPreset: PresetDescriptor<number>;
@@ -638,6 +658,7 @@ const addSavedSubgraph = async () => {
 
   try {
     const preset = await getSubgraphPreset(pickedPreset.id);
+    logEvent('graph-editor', 'add-saved-subgraph', { presetId: pickedPreset.id });
     getEngine()!.load_serialized_subgraph(JSON.stringify(preset));
   } catch (err) {
     logError('Error fetching subgraph preset', err);
@@ -657,7 +678,14 @@ const GraphControls: React.FC<GraphControlsProps> = ({ lGraphInstance }) => {
 
     return filterNils([
       lGraphInstance
-        ? { type: 'button', label: 'arrange nodes', action: () => lGraphInstance.arrange() }
+        ? {
+            type: 'button',
+            label: 'arrange nodes',
+            action: () => {
+              logEvent('graph-editor', 'arrange-nodes');
+              lGraphInstance.arrange();
+            },
+          }
         : null,
       {
         type: 'select',

@@ -2,7 +2,6 @@ use std::mem::MaybeUninit;
 
 use dsp::{
   filters::biquad::{BiquadFilter, BiquadFilterBank2D, FilterMode},
-  rms_level_detector::RMSLevelDetector,
   FRAME_SIZE,
 };
 
@@ -24,12 +23,6 @@ const BAND_ORDER: usize = 16; // 24;
 const BAND_COUNT: usize = 22; // 36;
 const FILTERS_PER_BAND: usize = BAND_ORDER;
 
-/// We use RMS level detection, so we need to make sure that the window size is big enough to
-/// capture a full cycle of the signal.  For lower frequencies, we need a longer window.
-fn compute_level_detection_window_samples(band_center_freq_hz: f32) -> f32 {
-  (1. / band_center_freq_hz) * SAMPLE_RATE as f32
-}
-
 pub struct VocoderBand {
   pub filters: [BiquadFilter; FILTERS_PER_BAND],
 }
@@ -44,39 +37,60 @@ impl VocoderBand {
   }
 }
 
-pub struct LevelDetectionBand(RMSLevelDetector<false>);
+fn one_pole_coeff(tau_s: f32) -> f32 { (-1. / (SAMPLE_RATE as f32 * tau_s)).exp() }
+
+/// Two-stage envelope follower: attack/release one-pole on |x|, then a short smoothing pole to
+/// suppress residual ripple at 2*f_band which would otherwise ring-modulate the carrier.  Time
+/// constants scale with band center frequency, clamped so low bands stay responsive and high
+/// bands stay smooth.
+pub struct LevelDetectionBand {
+  attack_coeff: f32,
+  release_coeff: f32,
+  smooth_coeff: f32,
+  ar_state: f32,
+  smooth_state: f32,
+}
 
 impl LevelDetectionBand {
   fn new(band_center_freq_hz: f32) -> Self {
-    // TODO: I'm pretty sure this value isn't good and contributes to poor vocoder quality
-    let window_size_samples = compute_level_detection_window_samples(band_center_freq_hz);
-    LevelDetectionBand(RMSLevelDetector::new(window_size_samples.ceil() as usize))
+    let attack_tau = (0.5 / band_center_freq_hz).clamp(0.001, 0.012);
+    let release_tau = (4. / band_center_freq_hz).clamp(0.02, 0.08);
+    let smooth_tau = (0.5 / band_center_freq_hz).clamp(0.0003, 0.006);
+    LevelDetectionBand {
+      attack_coeff: one_pole_coeff(attack_tau),
+      release_coeff: one_pole_coeff(release_tau),
+      smooth_coeff: one_pole_coeff(smooth_tau),
+      ar_state: 0.,
+      smooth_state: 0.,
+    }
+  }
+
+  pub fn process(&mut self, sample: f32) -> f32 {
+    let x = sample.abs();
+    let coeff = if x > self.ar_state {
+      self.attack_coeff
+    } else {
+      self.release_coeff
+    };
+    self.ar_state = coeff * self.ar_state + (1. - coeff) * x;
+    self.smooth_state =
+      self.smooth_coeff * self.smooth_state + (1. - self.smooth_coeff) * self.ar_state;
+    if self.smooth_state < 1e-10 && x == 0. {
+      self.ar_state = 0.;
+      self.smooth_state = 0.;
+    }
+    self.smooth_state
   }
 }
 
-impl LevelDetectionBand {
-  /// RMS level detection
-  pub fn process(&mut self, sample: f32) -> f32 { self.0.process(sample) }
-}
-
 pub struct LevelDetectionCtx {
-  pub bands: [Box<LevelDetectionBand>; BAND_COUNT],
+  pub bands: [LevelDetectionBand; BAND_COUNT],
 }
 
 impl LevelDetectionCtx {
   fn new(band_center_freqs_hz: &[f32]) -> Self {
-    let mut bands = MaybeUninit::<[Box<LevelDetectionBand>; BAND_COUNT]>::uninit();
-    let bands_ptr = bands.as_mut_ptr() as *mut Box<LevelDetectionBand>;
-    for band_ix in 0..BAND_COUNT {
-      let center_freq_hz = band_center_freqs_hz[band_ix];
-      unsafe {
-        bands_ptr
-          .add(band_ix)
-          .write(Box::new(LevelDetectionBand::new(center_freq_hz)));
-      }
-    }
     Self {
-      bands: unsafe { bands.assume_init() },
+      bands: std::array::from_fn(|band_ix| LevelDetectionBand::new(band_center_freqs_hz[band_ix])),
     }
   }
 }
@@ -313,47 +327,37 @@ pub extern "C" fn vocoder_process(
 }
 
 #[test]
-fn level_detection_correctness() {
-  use dsp::rms_level_detector::MAX_LEVEL_DETECTION_WINDOW_SAMPLES;
+fn envelope_follower_dynamics() {
+  let f_c = 1000.;
+  let mut det = LevelDetectionBand::new(f_c);
 
-  let mut level_detector = LevelDetectionBand::new(100.);
-  level_detector.0.negative_window_size_samples =
-    -((MAX_LEVEL_DETECTION_WINDOW_SAMPLES - 2) as isize);
-  level_detector.0.window_size_samples_f32 = MAX_LEVEL_DETECTION_WINDOW_SAMPLES as f32;
-  let mut samples = [0.; MAX_LEVEL_DETECTION_WINDOW_SAMPLES];
-  for i in 0..MAX_LEVEL_DETECTION_WINDOW_SAMPLES {
-    samples[i] = -(i as isize) as f32;
+  let mut level = 0.;
+  for i in 0..SAMPLE_RATE {
+    let s = (i as f32 / SAMPLE_RATE as f32 * f_c * std::f32::consts::TAU).sin();
+    level = det.process(s);
   }
+  assert!(level > 0.5 && level < 1.05, "{level}");
 
-  let expected_sum: f32 = samples.iter().map(|sample| *sample * *sample).sum();
-  let expected_output = (expected_sum / MAX_LEVEL_DETECTION_WINDOW_SAMPLES as f32).sqrt();
-
-  let mut output = 0.;
-  for sample in samples {
-    output = level_detector.process(sample);
+  for _ in 0..SAMPLE_RATE {
+    level = det.process(0.);
   }
-
-  assert_eq!(output, expected_output);
-
-  // Should be about the same after another iteration
-  let mut output = 0.;
-  for sample in samples {
-    output = level_detector.process(sample);
-  }
-
-  assert!((output - expected_output).abs() < 0.001f32);
+  assert_eq!(level, 0.);
 }
 
 #[test]
-fn get_max_level_detection_window_size() {
-  use dsp::rms_level_detector::MAX_LEVEL_DETECTION_WINDOW_SAMPLES;
-  let window_size = compute_level_detection_window_samples(11.596639);
-  assert!(window_size.ceil() < MAX_LEVEL_DETECTION_WINDOW_SAMPLES as f32);
-}
-
-#[test]
-fn compute_level_detection_window_samples_sanity() {
-  let window_size = compute_level_detection_window_samples(60.);
-  // 60hz -> 16.666ms -> 735 samples
-  assert!((window_size - 735.).abs() < 1.);
+fn envelope_follower_ripple() {
+  // ripple on a steady high-band sine must stay small; the old windowed-RMS detector had ~10%
+  // ripple here which ring-modulated the carrier
+  let f_c = 9000.;
+  let mut det = LevelDetectionBand::new(f_c);
+  let (mut min, mut max) = (f32::MAX, 0f32);
+  for i in 0..SAMPLE_RATE * 2 {
+    let s = (i as f32 / SAMPLE_RATE as f32 * f_c * std::f32::consts::TAU).sin();
+    let level = det.process(s);
+    if i > SAMPLE_RATE {
+      min = min.min(level);
+      max = max.max(level);
+    }
+  }
+  assert!((max - min) / max < 0.01, "ripple {:.4}", (max - min) / max);
 }

@@ -10,3 +10,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 dsp = { path = "../dsp" }
 common = { path = "../common" }
+
+[dev-dependencies]
+hound = "3.4"
+rustfft = "6.1"

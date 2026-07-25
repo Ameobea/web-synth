@@ -8,6 +8,7 @@ import type {
   ConnectableType,
 } from 'src/patchNetwork';
 import { Map as ImmMap } from 'immutable';
+import { logEvent } from 'src/eventAnalytics';
 import { getEngine } from 'src/util';
 import type { LGraphNode } from 'litegraph.js';
 import { actionCreators, dispatch, getState, store } from 'src/redux';
@@ -210,6 +211,7 @@ export class SubgraphPortalNode implements ForeignNode {
         renamePort: (side: 'input' | 'output', oldName: string, newName: string) =>
           void this.renamePort(side, oldName, newName),
         setSubgraphName: (newSubgraphName: string) => {
+          logEvent('graph-editor', 'rename-subgraph');
           getEngine()!.rename_subgraph(this.rxSubgraphID, newSubgraphName);
           if (this.lgNode) {
             this.lgNode.title = newSubgraphName;
@@ -455,6 +457,7 @@ export class SubgraphPortalNode implements ForeignNode {
   }
 
   public onNodeDblClicked() {
+    logEvent('graph-editor', 'enter-subgraph');
     getEngine()!.set_active_subgraph_id(this.rxSubgraphID);
   }
 }

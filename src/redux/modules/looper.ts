@@ -233,7 +233,11 @@ const looperSlice = createSlice({
         updateBackend?: boolean;
       }>
     ) => {
+      // dispatched from worklet port messages which can race VC deletion
       const instState = state.stateByVcId[vcId];
+      if (!instState) {
+        return;
+      }
       const modulestate = instState.modules[moduleIx];
       modulestate.activeBankIx = bankIx;
 
@@ -253,6 +257,9 @@ const looperSlice = createSlice({
       { payload: { vcId, phaseSAB } }: PayloadAction<{ vcId: string; phaseSAB: Float32Array }>
     ) => {
       const instState = state.stateByVcId[vcId];
+      if (!instState) {
+        return;
+      }
       instState.phaseSAB = phaseSAB;
     },
     setIsHidden: (

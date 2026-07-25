@@ -3,6 +3,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import ControlPanel from 'react-control-panel';
 
 import './GlobalVolume.css';
+import { logEvent } from 'src/eventAnalytics';
 import { getEngine } from 'src/util';
 import { createPortal } from 'react-dom';
 import { VirtualVCDefinitions } from 'src/ViewContextManager/virtualVCDefinitions';
@@ -156,6 +157,7 @@ const AddModulePicker: React.FC<AddModulePickerProps> = ({ onClose }) => {
             return;
           }
 
+          logEvent('vcm', 'add-view-context', { type: vc.name });
           engine.create_view_context(vc.name, selectedModule);
           onClose();
         },

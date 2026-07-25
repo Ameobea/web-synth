@@ -6,6 +6,7 @@ import { useQuery } from 'react-query';
 import ControlPanel from 'react-control-panel';
 
 import { getLoggedInUsername } from 'src/api';
+import { logEvent } from 'src/eventAnalytics';
 import { parseUploadedFileAsText } from 'src/controls/FileUploader';
 import { renderModalWithControls } from 'src/controls/Modal';
 import { LoginModal } from 'src/login/LoginModal';
@@ -78,10 +79,17 @@ const GlobalTempoControl: React.FC = () => {
             setTempo(value);
           }
         }}
+        onBlur={() => {
+          const parsed = Number.parseFloat(tempo);
+          if (!Number.isNaN(parsed)) {
+            logEvent('transport', 'set-bpm', { bpm: Math.round(parsed), method: 'input' });
+          }
+        }}
       />
 
       <TapInBPM
         onSubmit={newBPM => {
+          logEvent('transport', 'set-bpm', { bpm: Math.round(newBPM), method: 'tap' });
           setTempo(newBPM.toFixed(2));
           setGlobalBpm(newBPM);
         }}
@@ -233,6 +241,7 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ closeMenu, engine, isOpen }) =>
       <GlobalTempoControl />
       <GlobalMenuItem
         onClick={() => {
+          logEvent('app-menu', 'save-to-file');
           serializeAndDownloadComposition();
           closeMenu();
         }}
@@ -267,6 +276,8 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ closeMenu, engine, isOpen }) =>
               );
               if (res.value) {
                 alert('Error loading composition: ' + res.value);
+              } else {
+                logEvent('app-menu', 'load-from-file', { bytes: fileContent.length });
               }
               closeMenu();
             }}
@@ -294,7 +305,10 @@ const GlobalMenuButton: React.FC<GlobalMenuButtonProps> = ({ engine }) => {
       <div
         title='Open Menu'
         role='button'
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          logEvent('app-menu', 'open');
+          setIsOpen(true);
+        }}
         className='global-menu-button'
         dangerouslySetInnerHTML={{ __html: HamburgerMenuIcon }}
       ></div>

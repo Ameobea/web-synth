@@ -15,7 +15,8 @@ import {
 } from 'src/faustEditor/compileHandlers';
 import { useWindowSize } from 'src/reactUtils';
 import type { Effect } from 'src/redux/modules/effects';
-import { getSentry, logError } from 'src/sentry';
+import { logEvent } from 'src/eventAnalytics';
+import { logError } from 'src/sentry';
 import { filterNils } from 'src/util';
 import { SpectrumVisualization } from 'src/visualizations/spectrum';
 
@@ -78,11 +79,11 @@ const buildCodeEditorControlPanelSettings = ({
       label: isRunning ? 'stop' : 'compile',
       action: isRunning
         ? () => {
-            getSentry()?.captureMessage('Stopping Faust editor instance');
+            logEvent('faust-editor', 'stop');
             stopInstance();
           }
         : () => {
-            getSentry()?.captureMessage('Compiling Faust editor instance');
+            logEvent('faust-editor', 'compile');
             compile();
           },
     },

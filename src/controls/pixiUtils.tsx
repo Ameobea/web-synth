@@ -11,7 +11,8 @@ export const makeDraggable = (g: PIXI.Graphics, parent: DragState, stopPropagati
   g.interactive = true;
 
   const pointerMoveCb = () => {
-    if (!parent.dragData) {
+    // `g` can be destroyed mid-drag; the document-level listener outlives it
+    if (!parent.dragData || g.destroyed || !g.parent) {
       return;
     }
 

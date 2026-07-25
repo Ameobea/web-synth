@@ -8,6 +8,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import './MIDIEditor.css';
 
 import { getExistingMIDICompositionTags, getMIDIComposition, saveMIDIComposition } from 'src/api';
+import { logEvent } from 'src/eventAnalytics';
 import FileUploader, { type FileUploaderValue } from 'src/controls/FileUploader';
 import { renderGenericPresetSaverWithModal } from 'src/controls/GenericPresetPicker/GenericPresetSaver';
 import { getMidiImportSettings, type MidiFileInfo } from 'src/controls/MidiImportDialog';
@@ -217,6 +218,7 @@ const handleMIDIFileUpload = async (
       lines,
       view: { ...curState.view },
     });
+    logEvent('midi-editor', 'import-midi-file', { lineCount: lines.length });
   } catch (err) {
     if (err) {
       console.error('Error importing MIDI: ', err);
@@ -283,6 +285,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
             return;
           }
 
+          logEvent('midi-editor', 'record-start');
           setIsRecording(true);
           playbackHandler.startRecording(activeInstance.current.managedInst);
         }}
@@ -335,6 +338,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
             return;
           }
 
+          logEvent('midi-editor', 'toggle-loop', { enabled: !state.loopEnabled });
           onChange({ ...state, loopEnabled: !state.loopEnabled });
         }}
         label='LOOP'
@@ -371,6 +375,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       />
       <MIDIEditorControlButton
         onClick={() => {
+          logEvent('midi-editor', 'toggle-velocity-display', { enabled: !velocityDisplayEnabled });
           parentInst.uiManager.setVelocityDisplayEnabled(
             !parentInst.uiManager.velocityDisplayEnabled
           );
@@ -382,7 +387,10 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
         active={velocityDisplayEnabled}
       />
       <MIDIEditorControlButton
-        onClick={() => parentInst.tempoTrackOpen.set(!parentInst.tempoTrackOpen.current)}
+        onClick={() => {
+          logEvent('midi-editor', 'toggle-tempo-track', { open: !parentInst.tempoTrackOpen.current });
+          parentInst.tempoTrackOpen.set(!parentInst.tempoTrackOpen.current);
+        }}
         label='♩='
         title='Toggle tempo track'
         style={{ fontSize: 20, textAlign: 'center', lineHeight: '36px' }}
@@ -435,6 +443,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
             return;
           }
 
+          logEvent('midi-editor', 'quantize-notes');
           activeInstance.current.snapAllSelectedNotes();
         }}
         title='Auto-snap all selected notes'
@@ -453,7 +462,10 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
       <div className='labeled-container'>
         <label>Snap Interval</label>
         <SnapControls
-          onChange={newBeatSnapInterval => parentInst.setBeatSnapInterval(newBeatSnapInterval)}
+          onChange={newBeatSnapInterval => {
+            logEvent('midi-editor', 'set-snap-interval', { beats: newBeatSnapInterval });
+            parentInst.setBeatSnapInterval(newBeatSnapInterval);
+          }}
           initialBeatSnapInterval={initialState.beatSnapInterval}
         />
       </div>
@@ -515,6 +527,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
               saveParams.tags ?? []
             );
             toastSuccess('MIDI composition saved');
+            logEvent('midi-editor', 'save-composition', { tagCount: (saveParams.tags ?? []).length });
           } catch (err) {
             toastError(`Failed to save MIDI composition: ${err}`);
           }
@@ -544,6 +557,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
               lines: composition.lines,
               view: { scrollVerticalPx: composition.view.scrollVerticalPx },
             });
+            logEvent('midi-editor', 'load-composition', { compositionId: preset.id });
           } catch (_err) {
             return;
           }
@@ -583,6 +597,7 @@ const MIDIEditorControlsInner: React.FC<MIDIEditorControlsProps> = ({
           const midiModule = await MIDIWasmModule.get();
           const midiFileData = midiModule.write_to_midi('midi_composition', rawNoteDataBuf);
           download(midiFileData, 'midi_composition.mid', 'audio/midi');
+          logEvent('midi-editor', 'export-midi-file');
         }}
         title='Download MIDI File'
         label={

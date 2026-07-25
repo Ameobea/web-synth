@@ -3,6 +3,7 @@ import ControlPanel from 'react-control-panel';
 import { Provider, shallowEqual, useSelector } from 'react-redux';
 
 import { getSynthVoicePreset, saveSynthVoicePreset } from 'src/api';
+import { logEvent } from 'src/eventAnalytics';
 import {
   mkControlPanelADSR2WithSize,
   type ADSRWithOutputRange,
@@ -82,6 +83,10 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
             toastError(`Error fetching voice preset: ${err}`);
             return;
           }
+          logEvent('synth-designer', 'load-voice-preset', {
+            presetId: pickedPreset.preset,
+            presetName: pickedPreset.name,
+          });
           dispatch(actionCreators.synthDesigner.SET_VOICE_STATE(index, body));
         },
       },
@@ -95,6 +100,7 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({ index, stateK
           const presetBody = getVoicePreset(stateKey, index);
           try {
             await saveSynthVoicePreset({ title, description: description ?? '', body: presetBody });
+            logEvent('synth-designer', 'save-voice-preset');
           } catch (_err) {
             // modal cancelled or save failed (failures are reported to Sentry in `apiPost`)
           }
@@ -293,6 +299,7 @@ const SynthModuleCompInner: React.FC<SynthModuleCompProps> = ({
             return;
           }
 
+          logEvent('synth-designer', 'delete-voice', { index });
           dispatch(actionCreators.synthDesigner.DELETE_SYNTH_MODULE(index));
           const vcId = stateKey.split('_')[1]!;
           const newConnectables = get_synth_designer_audio_connectables(stateKey);

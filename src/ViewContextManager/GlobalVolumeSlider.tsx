@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import './GlobalVolume.css';
+import { logEvent } from 'src/eventAnalytics';
 import { setGlobalVolume } from './globalVolume';
 
 interface GlobalVolumeSliderProps {
@@ -37,6 +38,7 @@ export const GlobalVolumeSlider: React.FC<GlobalVolumeSliderProps> = ({ onClose 
               setValue(value);
               setGlobalVolume(value);
             }}
+            onPointerUp={() => logEvent('transport', 'set-volume', { volume: +value })}
           />
         </div>,
         document.getElementById('content')!

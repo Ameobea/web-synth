@@ -117,10 +117,7 @@ export const disconnectNodes = (
   try {
     (src as any).disconnect(dst, src instanceof PlaceholderOutput ? dstDescriptor : undefined);
   } catch (err) {
-    if (
-      err instanceof DOMException &&
-      err.message.includes('is not connected to the given destination')
-    ) {
+    if (err instanceof DOMException && err.name === 'InvalidAccessError') {
       console.warn("Tried to disconnect two nodes that aren't connected; ", {
         src,
         dst,

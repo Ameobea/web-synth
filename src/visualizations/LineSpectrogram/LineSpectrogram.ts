@@ -26,12 +26,15 @@ const LineSpectrogramWasmBytes = new AsyncOnce(
 export class LineSpectrogram {
   public store: Writable<LineSpectrogramUIState>;
   private analyserNode: AnalyserNode;
-  private renderWorker: Worker;
-  private notifySAB: SharedArrayBuffer;
-  private notifySABI32: Int32Array;
-  private frequencyDataSAB: SharedArrayBuffer;
-  private frequencyDataSABU8: Uint8Array;
-  private frequencyDataBufTemp: Uint8Array<ArrayBuffer>;
+  // pages without cross-origin isolation (external embeds) have no `SharedArrayBuffer`; the viz
+  // renders nothing there rather than crashing whatever contains it
+  private disabled = typeof SharedArrayBuffer === 'undefined';
+  private renderWorker!: Worker;
+  private notifySAB!: SharedArrayBuffer;
+  private notifySABI32!: Int32Array;
+  private frequencyDataSAB!: SharedArrayBuffer;
+  private frequencyDataSABU8!: Uint8Array;
+  private frequencyDataBufTemp!: Uint8Array<ArrayBuffer>;
   private running = false;
   private frameIx = 0;
 
@@ -43,6 +46,9 @@ export class LineSpectrogram {
       );
     }
     this.analyserNode = analyserNode;
+    if (this.disabled) {
+      return;
+    }
     this.renderWorker = new Worker(new URL('./LineSpectrogram.worker.ts', import.meta.url), { type: 'module' });
 
     this.notifySAB = new SharedArrayBuffer(4);
@@ -90,18 +96,24 @@ export class LineSpectrogram {
     if (dpr !== Math.floor(dpr)) {
       throw new Error('dpr must be an integer');
     }
+    if (this.disabled) {
+      return;
+    }
 
     const msg: LineSpectrogramWorkerMessage = { type: 'setCanvas', canvas, dpr };
     this.renderWorker.postMessage(msg, [canvas]);
   }
 
   public resizeView(width: number, height: number) {
+    if (this.disabled) {
+      return;
+    }
     const msg: LineSpectrogramWorkerMessage = { type: 'resizeCanvas', width, height };
     this.renderWorker.postMessage(msg);
   }
 
   public start() {
-    if (this.running) {
+    if (this.running || this.disabled) {
       return;
     }
 
@@ -114,7 +126,7 @@ export class LineSpectrogram {
   }
 
   public destroy() {
-    this.renderWorker.terminate();
+    this.renderWorker?.terminate();
   }
 
   public serialize(): LineSpectrogramUIState {

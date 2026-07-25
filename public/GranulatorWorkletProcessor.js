@@ -125,11 +125,25 @@ class GranulatorWorkletProcessor extends AudioWorkletProcessor {
           break;
         }
         case 'setWasmBytes': {
-          this.initWasm(evt.data.wasmBytes);
+          this.initWasm(evt.data.wasmBytes).catch(err => {
+            this.wasmInitError = String(err);
+            console.error('granulator AWP wasm init failed:', err);
+          });
           break;
         }
         case 'shutdown': {
           this.isShutdown = true;
+          break;
+        }
+        case 'debug': {
+          this.port.postMessage({
+            type: 'debug',
+            hasSamples: !!this.samples,
+            sampleLen: this.samples?.length ?? 0,
+            hasWasm: !!this.wasmInstance,
+            ctxPtr: this.granularInstCtxPtr ?? 0,
+            wasmInitError: this.wasmInitError ?? null,
+          });
           break;
         }
         case 'startRecording': {

@@ -446,14 +446,12 @@ pub fn render_granular(
   let linear_slope_length = clamp(0., 1., linear_slope_length);
   let slope_linearity = clamp(0., 1., slope_linearity);
 
-  // Grain is clamped to the smoothed selection bounds so it can never read past the end.
+  // Grains *start* within the selection but may extend past its end into the rest of the sample;
+  // compositions rely on small selections with large grain sizes for this.  Reads are clamped to
+  // the buffer in `Grain::sample`, so no OOB is possible.
   let selection_start = ctx.last_start_sample_ix;
   let selection_end = ctx.last_end_sample_ix;
-  let grain_size = clamp(
-    1.,
-    (selection_end - selection_start).max(1.),
-    ctx.last_grain_size,
-  );
+  let grain_size = ctx.last_grain_size.max(1.);
 
   for i in 0..FRAME_SIZE {
     let sample = ctx.get_sample(

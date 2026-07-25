@@ -9,6 +9,7 @@ import type {
   LiteGraph as LiteGraphType,
 } from 'src/graphEditor/LiteGraphTypes';
 import type { AudioConnectables, ConnectableDescriptor } from 'src/patchNetwork';
+import { logEvent } from 'src/eventAnalytics';
 import { actionCreators, dispatch } from 'src/redux';
 
 export function LGAudioConnectables(this: any) {
@@ -114,6 +115,15 @@ LGAudioConnectables.prototype.onConnectionsChange = function (
 
   const from: ConnectableDescriptor = { vcId: linkInfo.origin_id.toString(), name: srcOutput.name };
   const to: ConnectableDescriptor = { vcId: linkInfo.target_id.toString(), name: dstInput.name };
+
+  // `connecting_node` is only set during a live user drag; programmatic connects during
+  // graph sync/deserialization leave it null
+  if (isNowConnected && (this.graph as any).list_of_graphcanvas?.[0]?.connecting_node) {
+    logEvent('graph-editor', 'connect', {
+      srcType: (srcNode as any).connectables?.node?.nodeType ?? 'vc',
+      dstType: (dstNode as any).connectables?.node?.nodeType ?? 'vc',
+    });
+  }
 
   // Dispatch a Redux action to trigger the patch network to be updated.  This will return a new Patch network and in turn
   // cause litegraph to be updated as well later.

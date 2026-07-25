@@ -18,6 +18,7 @@ import {
 } from 'src/eventScheduler';
 import GlobalMenuButton from 'src/globalMenu/GlobalMenu';
 import type { ReduxStore } from 'src/redux';
+import { logEvent } from 'src/eventAnalytics';
 import { getSentry } from 'src/sentry';
 import AddModulePicker from 'src/ViewContextManager/AddModulePicker';
 import RestartPlaybackIcon from './Icons/RestartPlayback.svg';
@@ -112,7 +113,7 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
           if (!confirmed) {
             return;
           }
-          getSentry()?.captureMessage('Reset Everything button clicked');
+          logEvent('vcm', 'reset-everything');
           engine.reset_vcm();
         }}
         style={{ backgroundColor: '#730505', padding: 1 }}
@@ -123,6 +124,7 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
       <ViewContextIcon
         displayName={globalBeatCounterStarted ? 'Stop Global Playback' : 'Start Global Playback'}
         onClick={() => {
+          logEvent('transport', globalBeatCounterStarted ? 'stop' : 'start');
           if (globalBeatCounterStarted) {
             stopAll();
           } else {
@@ -144,6 +146,7 @@ export const ViewContextManager: React.FC<VCMProps> = ({ engine }) => {
             : 'Start Global Playback From Beginning'
         }
         onClick={() => {
+          logEvent('transport', 'restart', { fromBookmark: hasBookmark });
           if (globalBeatCounterStarted) {
             stopAll();
           }
@@ -294,6 +297,7 @@ const ViewContextTab: React.FC<ViewContextTabProps> = ({
           getSentry()?.addBreadcrumb({
             message: `Switching to VC ${uuid} name=${name} title=${title}`,
           });
+          logEvent('vcm', 'switch-view-context', { type: name });
           engine.switch_view_context(uuid);
         }
       }}
@@ -308,6 +312,7 @@ const ViewContextTab: React.FC<ViewContextTabProps> = ({
               message: `Renaming VC ${uuid} name=${name} title=${title} to ${renamingTitle}`,
             });
             setIsRenaming(false);
+            logEvent('vcm', 'rename-view-context', { type: name });
             engine.set_vc_title(uuid, renamingTitle);
           }}
         />
@@ -318,6 +323,7 @@ const ViewContextTab: React.FC<ViewContextTabProps> = ({
               getSentry()?.addBreadcrumb({
                 message: `Deleting VC ${uuid} name=${name} title=${title}`,
               });
+              logEvent('vcm', 'delete-view-context', { type: name });
               engine.delete_vc_by_id(uuid);
               e.stopPropagation();
             }}

@@ -23,6 +23,7 @@ import BrowserNotSupported from 'src/misc/BrowserNotSupported';
 import { MIDINode } from 'src/patchNetwork/midiNode';
 import { useWindowSize } from 'src/reactUtils';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
+import { logEvent } from 'src/eventAnalytics';
 import { getSentry } from 'src/sentry';
 import { getDefaultFilterParams } from 'src/synthDesigner/filterHelpers';
 import {
@@ -102,13 +103,8 @@ document.addEventListener('mousedown', () => ctx.resume(), { once: true });
 document.addEventListener('touchstart', () => ctx.resume(), { once: true });
 document.addEventListener('touchend', () => ctx.resume(), { once: true });
 
-const sentryRecord = (msg: string, extra: Record<string, any> = {}) => {
-  const sentry = getSentry();
-  if (!sentry) {
-    return;
-  }
-  sentry.captureMessage(msg, { tags: { fmSynthDemo: true }, extra });
-};
+const recordEvent = (msg: string, extra: Record<string, any> = {}) =>
+  logEvent('fm-demo', msg, extra);
 
 getSentry()?.setContext('fmSynthDemo', { fmSynthDemo: true });
 
@@ -223,7 +219,14 @@ const synth = new FMSynth(ctx, undefined, {
   },
 });
 
-const playNote = (midiNumber: number) => void midiInputNode.onAttack(midiNumber, 90);
+let firstNotePlayed = false;
+const playNote = (midiNumber: number) => {
+  if (!firstNotePlayed) {
+    firstNotePlayed = true;
+    recordEvent('First note played');
+  }
+  void midiInputNode.onAttack(midiNumber, 90);
+};
 
 const releaseNote = (midiNumber: number) => void midiInputNode.onRelease(midiNumber, 90);
 
@@ -460,7 +463,7 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({
             }
 
             const presetName = controlPanelCtx.current['select preset'];
-            sentryRecord('Load preset', { presetName });
+            recordEvent('Load preset', { presetName });
             loadPreset(presetName);
           },
         },
@@ -471,7 +474,7 @@ const PresetsControlPanel: React.FC<PresetsControlPanelProps> = ({
               label: 'copy preset to clipboard',
               action: async () => {
                 const serialized = serializeState();
-                sentryRecord('Copy preset to keyboard', { serialized });
+                recordEvent('Copy preset to clipboard', { bytes: serialized.length });
                 try {
                   navigator.clipboard.writeText(serialized);
                   alert('Successfully copied to clipboard');
@@ -532,7 +535,7 @@ const MIDIInputControlPanel: React.FC = () => {
         type: 'button',
         action: () =>
           midiInput.getMidiInputNames().then(availableMIDIInputNames => {
-            sentryRecord('Refreshed FM synth demo MIDI device list', { availableMIDIInputNames });
+            recordEvent('Refreshed FM synth demo MIDI device list', { availableMIDIInputNames });
             setAvailableMIDIInputs(['', ...availableMIDIInputNames]);
           }),
       },
@@ -549,7 +552,7 @@ const MIDIInputControlPanel: React.FC = () => {
       onChange={(key: string, val: any) => {
         switch (key) {
           case 'midi device': {
-            sentryRecord('Selected MIDI device', { midiInputName: val });
+            recordEvent('Selected MIDI device', { midiInputName: val });
             setSelectedMIDIInputName(val);
             break;
           }
@@ -604,11 +607,23 @@ const FMSynthDemo: React.FC = () => {
         </div>
 
         <div className='fm-synth-mobile-links'>
-          <a href='/blog/fm-synth-rust-wasm-simd/'>Blog post</a>
+          <a
+            href='/blog/fm-synth-rust-wasm-simd/'
+            onClick={() => recordEvent('Clicked external link', { link: 'blog' })}
+          >
+            Blog post
+          </a>
           <br />
-          <a href='/docs/fm-synth'>Docs</a>
+          <a href='/docs/fm-synth' onClick={() => recordEvent('Clicked external link', { link: 'docs' })}>
+            Docs
+          </a>
           <br />
-          <a href='https://www.youtube.com/watch?v=42ytPljgJ_U'>Demo video + walkthrough</a>
+          <a
+            href='https://www.youtube.com/watch?v=42ytPljgJ_U'
+            onClick={() => recordEvent('Clicked external link', { link: 'video' })}
+          >
+            Demo video + walkthrough
+          </a>
         </div>
 
         <div className='midi-keyboard-wrapper' style={{ bottom: 0, position: 'absolute' }}>
@@ -638,7 +653,7 @@ const FMSynthDemo: React.FC = () => {
                 type: 'button',
                 label: showViz ? 'hide spectrogram' : 'show spectrogram',
                 action: () => {
-                  sentryRecord('toggle fm synth demo visualization', { wasVisible: showViz });
+                  recordEvent('toggle fm synth demo visualization', { wasVisible: showViz });
                   setShowViz(!showViz);
                 },
               },
@@ -686,6 +701,7 @@ const FMSynthDemo: React.FC = () => {
                   lenSamples: { type: 'constant', value: envelope.lenSamples },
                 });
                 if (GlobalState.filterADSREnabled !== enableADSR) {
+                  recordEvent('Toggle filter ADSR', { enabled: enableADSR });
                   synth.handleFilterFrequencyChange(
                     params.frequency,
                     enableADSR ? FilterParamControlSource.Envelope : FilterParamControlSource.Manual
@@ -693,6 +709,9 @@ const FMSynthDemo: React.FC = () => {
                 }
                 GlobalState.filterADSREnabled = enableADSR;
 
+                if (bypass !== GlobalState.filterBypassed) {
+                  recordEvent('Toggle filter bypass', { bypassed: bypass });
+                }
                 if (bypass && !GlobalState.filterBypassed) {
                   bypassFilter();
                 } else if (!bypass && GlobalState.filterBypassed) {
@@ -712,7 +731,7 @@ const FMSynthDemo: React.FC = () => {
           octaveOffset={octaveOffset}
           onOctaveOffsetChange={newOctaveOffset => {
             setOctaveOffset(newOctaveOffset);
-            sentryRecord('Octave offset change', { newOctaveOffset });
+            recordEvent('Octave offset change', { newOctaveOffset });
           }}
           onAttack={midiNumber => playNote(midiNumber)}
           onRelease={midiNumber => releaseNote(midiNumber)}

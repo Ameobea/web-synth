@@ -38,7 +38,7 @@ import { MIDINode } from 'src/patchNetwork/midiNode';
 import { mkContainerCleanupHelper, mkContainerRenderHelper } from 'src/reactUtils';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
 import { getSentry } from 'src/sentry';
-import { AsyncOnce, normalizeEnvelope, UnimplementedError, UnreachableError } from 'src/util';
+import { AsyncOnce, delay, normalizeEnvelope, UnreachableError } from 'src/util';
 import { EventSchedulerInitialized } from 'src/eventScheduler';
 import type { FilterParams } from 'src/redux/modules/synthDesigner';
 import { buildDefaultFilter } from 'src/synthDesigner/filterHelpersLight';
@@ -386,8 +386,11 @@ export default class FMSynth implements ForeignNode {
       getProps: () => ({
         synth: this,
         midiNode,
-        getFMSynthOutput: () => {
-          throw new UnimplementedError();
+        getFMSynthOutput: async () => {
+          while (!this.awpHandle) {
+            await delay(50);
+          }
+          return this.awpHandle;
         },
         synthID: vcId ?? '',
         isHidden: false,

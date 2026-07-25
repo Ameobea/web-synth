@@ -28,6 +28,7 @@ import BasicModal from 'src/misc/BasicModal';
 import FlatButton from 'src/misc/FlatButton';
 import { getState } from 'src/redux';
 import { getSample, hashSampleDescriptor, type SampleDescriptor } from 'src/sampleLibrary';
+import { logEvent } from 'src/eventAnalytics';
 import { getSentry } from 'src/sentry';
 import { NIL_UUID, formatDateTime, getEngine } from 'src/util';
 import { saveSubgraphPreset } from 'src/graphEditor/GraphEditor';
@@ -310,14 +311,7 @@ const handleSave = async (parentID: number | null): Promise<number | null> => {
       title: parentID ? 'Save New Version' : 'Save Composition',
     });
 
-    getSentry()?.captureMessage('Saving composition', {
-      tags: {
-        title,
-        description,
-        tags: tags?.join(','),
-        parentID,
-      },
-    });
+    logEvent('composition', 'save', { title, description, tags: tags?.join(','), parentID });
     const savedCompositionID = await serializeAndSaveComposition({
       title,
       description: description ?? '',
@@ -429,6 +423,7 @@ const LoadComposition: React.FC = () => (
             compositions.map(comp => ({ ...comp, name: comp.title, preset: comp }))
           );
 
+        logEvent('composition', 'library-open');
         let compID: string | number = '';
         try {
           const pickedComp = await pickPresetWithModal(
@@ -467,6 +462,7 @@ const LoadComposition: React.FC = () => (
           alert('Error loading composition: ' + res.value);
           return;
         }
+        logEvent('composition', 'load', { id: +compID });
         // only drop the backed-up local composition once the load actually succeeded
         await clearLocalComposition();
       }}

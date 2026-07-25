@@ -7,6 +7,7 @@ import {
   type ADSRWithOutputRange,
 } from 'src/controls/adsr2/ControlPanelADSR2';
 import { buildDefaultADSR2Envelope } from 'src/controls/adsr2/adsr2Helpers';
+import { logEvent } from 'src/eventAnalytics';
 import { AdsrLengthMode } from 'src/graphEditor/nodes/CustomAudio/FMSynth';
 import type FMSynth from 'src/graphEditor/nodes/CustomAudio/FMSynth/FMSynth';
 import { getSynthDesignerReduxInfra, type FilterParams } from 'src/redux/modules/synthDesigner';
@@ -193,14 +194,19 @@ export const Filter: React.FC<FilterProps> = ({
   const handleChange = useCallback(
     (key: string, val: any) => {
       if (key === 'bypass') {
+        logEvent('synth-designer', 'filter-bypass', { bypassed: val });
         dispatch(actionCreators.synthDesigner.SET_FILTER_IS_BYPASSED(synthIx, val));
         return;
       }
       if (key === 'enable envelope') {
+        logEvent('synth-designer', 'filter-envelope-toggle', { enabled: val });
         dispatch(actionCreators.synthDesigner.SET_FILTER_ENVELOPE_ENABLED(synthIx, val));
         return;
       }
 
+      if (key === 'type') {
+        logEvent('synth-designer', 'filter-type-change', { type: val });
+      }
       dispatch(actionCreators.synthDesigner.SET_FILTER_PARAM(synthIx, key as any, val));
     },
     [actionCreators.synthDesigner, dispatch, synthIx]
