@@ -79,7 +79,7 @@ LGAudioConnectables.prototype.onPropertyChanged = function (name: string, value:
 
 LGAudioConnectables.prototype.onConnectionsChange = function (
   this: { graph: LiteGraphType },
-  _connection: 1 | 2,
+  connection: 1 | 2,
   _slot: number,
   isNowConnected: boolean,
   linkInfo: LiteGraphLink,
@@ -117,8 +117,13 @@ LGAudioConnectables.prototype.onConnectionsChange = function (
   const to: ConnectableDescriptor = { vcId: linkInfo.target_id.toString(), name: dstInput.name };
 
   // `connecting_node` is only set during a live user drag; programmatic connects during
-  // graph sync/deserialization leave it null
-  if (isNowConnected && (this.graph as any).list_of_graphcanvas?.[0]?.connecting_node) {
+  // graph sync/deserialization leave it null.  One connection fires this callback on both
+  // endpoint nodes, so only log from the input side.
+  if (
+    isNowConnected &&
+    connection === LiteGraph.INPUT &&
+    (this.graph as any).list_of_graphcanvas?.[0]?.connecting_node
+  ) {
     logEvent('graph-editor', 'connect', {
       srcType: (srcNode as any).connectables?.node?.nodeType ?? 'vc',
       dstType: (dstNode as any).connectables?.node?.nodeType ?? 'vc',
